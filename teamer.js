@@ -376,6 +376,11 @@
           <div class="ttdb-chart-scroll"><svg id="ttdb-bar" style="display:block;width:100%;min-width:480px" height="200"></svg></div>
         </div>
 
+        <div class="ttdb-card">
+          <div class="ttdb-card-title"><span>Por categoría</span></div>
+          <div id="ttdb-cats"></div>
+        </div>
+
         <div class="ttdb-row2">
           <div class="ttdb-card">
             <div class="ttdb-card-title"><span>Estado</span></div>
@@ -507,6 +512,8 @@
           if (d < cutoff) { done = true; break; }
           state.dash.items.push({
             month:    d.toISOString().slice(0, 7),
+            initDate: item.processInitDate,
+            dueDate:  item.processDueDate  || null,
             category: (item.categoryDescription || "").trim(),
             typeDesc: item.requestTypeDescription || "",
             status:   item.processStatus || "",
@@ -546,7 +553,9 @@
       const vol = 60 + Math.round(Math.random() * 80) + (m < 3 ? 20 : 0);
       for (let i = 0; i < vol; i++) {
         const cat = Math.random() < 0.38 ? cats[0] : cats[1 + Math.floor(Math.random() * 5)];
-        state.dash.items.push({ month, category: cat, typeDesc: "[" + (40000+Math.floor(Math.random()*5000)) + "] " + types[Math.floor(Math.random()*types.length)], status: sts[Math.floor(Math.random()*sts.length)] });
+        const rd = new Date(d.getFullYear(), d.getMonth(), 1 + Math.floor(Math.random()*28));
+        const due = new Date(rd); due.setDate(due.getDate() + [1,5,10,28,60][Math.floor(Math.random()*5)]);
+        state.dash.items.push({ month, initDate: rd.toISOString(), dueDate: due.toISOString(), category: cat, typeDesc: "[" + (40000+Math.floor(Math.random()*5000)) + "] " + types[Math.floor(Math.random()*types.length)], status: sts[Math.floor(Math.random()*sts.length)] });
       }
     }
     dashSetLoading(false);
@@ -564,11 +573,42 @@
 
     dashRenderKPIs(inWin);
     dashRenderBar(months, inWin);
+    dashRenderCategories(inWin);
     dashRenderDonut(inWin);
     dashRenderTypes(inWin);
 
     const period = document.getElementById("ttdb-period");
     if (period) period.textContent = months[0] + " → " + months[months.length-1];
+  }
+
+  function dashRenderCategories(items) {
+    const el = document.getElementById("ttdb-cats");
+    if (!el) return;
+    const counts = {};
+    items.forEach(i => { const c = i.category || "(sin categoría)"; counts[c] = (counts[c]||0)+1; });
+    const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    const maxC = sorted[0]?.[1] || 1;
+    const total = items.length || 1;
+    const catColors = {
+      "Consultas":                           "#00C4E9",
+      "Ticketing (Nuevo SAI)":               "#7c3aed",
+      "Operación":                           "#00CFB9",
+      "Aprovisionamiento de Infraestructura":"#f4c53d",
+      "Ciclo de vida de aplicación":         "#e83e8c",
+      "Plataforma Cognitiva":                "#30BBE2",
+    };
+    el.innerHTML = sorted.map(([name, count]) => {
+      const color = catColors[name] || "#8a9bb0";
+      const w = Math.round(count / maxC * 100);
+      return `<div class="ttdb-type-row">
+        <div class="ttdb-type-name" style="min-width:200px;max-width:200px" title="${name}">${name}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1;width:auto">
+          <div class="ttdb-type-bar-fill" style="width:${w}%;background:${color}"></div>
+        </div>
+        <div class="ttdb-type-count" style="width:50px">${fmtN(count)}</div>
+        <div style="width:32px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pctN(count,total)}%</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:20px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
 
   function dashBuildMonths(n) {
@@ -587,15 +627,75 @@
   function dashRenderKPIs(items) {
     const el = document.getElementById("ttdb-kpis");
     if (!el) return;
-    const total = items.length, cons = items.filter(isConsulta).length, pet = total - cons;
-    const inp   = items.filter(i=>i.status==="InProgress").length;
-    const exp   = items.filter(i=>i.status==="Expired").length;
+
+    const now    = new Date();
+    const todayS = now.toISOString().slice(0, 10);
+    const weekAgo = new Date(now - 7 * 86400000);
+
+    const total  = items.length;
+    const cons   = items.filter(isConsulta).length;
+    const pet    = total - cons;
+    const inp    = items.filter(i => i.status === "InProgress").length;
+    const exp    = items.filter(i => i.status === "Expired").length;
+    const cancelled = items.filter(i => i.status === "Cancelled").length;
+    const hoy    = items.filter(i => (i.initDate || "").slice(0, 10) === todayS).length;
+    const semana = items.filter(i => i.initDate && new Date(i.initDate) >= weekAgo).length;
+
+    // En riesgo: InProgress con dueDate pasado o dentro de 48h
+    const limit48 = new Date(now.getTime() + 48 * 3600000);
+    const riesgo  = items.filter(i => i.status === "InProgress" && i.dueDate && new Date(i.dueDate) <= limit48).length;
+
+    // MoM: compara el penúltimo mes completo vs el anterior (evita el mes actual incompleto)
+    const allMonths = dashBuildMonths(12);
+    const prevFull  = allMonths[allMonths.length - 2];  // mes anterior completo
+    const prev2Full = allMonths[allMonths.length - 3];  // dos meses atrás
+    const countPrev  = state.dash.items.filter(i => i.month === prevFull).length;
+    const countPrev2 = state.dash.items.filter(i => i.month === prev2Full).length;
+    const momDelta   = countPrev2 ? Math.round((countPrev - countPrev2) / countPrev2 * 100) : null;
+    const momSign    = momDelta === null ? "—" : (momDelta >= 0 ? "▲" : "▼");
+    const momColor   = momDelta === null ? "#8a9bb0" : momDelta > 10 ? "#e83e8c" : momDelta > 0 ? "#f4c53d" : "#00CFB9";
+    const momText    = momDelta === null ? "—" : `${momSign} ${Math.abs(momDelta)}%`;
+
+    // Tasa de cierre sin resolución: (Cancelled + Expired) / total
+    const sinResolver = cancelled + exp;
+    const tasaSinRes  = pctN(sinResolver, total);
+
     el.innerHTML = `
-      <div class="ttdb-kcard ttdb-kc-acc"><div class="ttdb-kl">Total</div><div class="ttdb-kv">${fmtN(total)}</div><div class="ttdb-ksub">en el periodo</div></div>
-      <div class="ttdb-kcard ttdb-kc-pur"><div class="ttdb-kl">Peticiones</div><div class="ttdb-kv">${fmtN(pet)}</div><div class="ttdb-ksub">${pctN(pet,total)}% del total</div></div>
-      <div class="ttdb-kcard ttdb-kc-grn"><div class="ttdb-kl">Consultas</div><div class="ttdb-kv">${fmtN(cons)}</div><div class="ttdb-ksub">${pctN(cons,total)}% del total</div></div>
-      <div class="ttdb-kcard ttdb-kc-amb"><div class="ttdb-kl">En progreso</div><div class="ttdb-kv">${fmtN(inp)}</div><div class="ttdb-ksub">activos</div></div>
-      <div class="ttdb-kcard ttdb-kc-rose"><div class="ttdb-kl">Vencidos</div><div class="ttdb-kv">${fmtN(exp)}</div><div class="ttdb-ksub">${pctN(exp,total)}%</div></div>
+      <div class="ttdb-kcard ttdb-kc-acc">
+        <div class="ttdb-kl">Total periodo</div>
+        <div class="ttdb-kv">${fmtN(total)}</div>
+        <div class="ttdb-ksub">${fmtN(hoy)} hoy · ${fmtN(semana)} esta semana</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-pur">
+        <div class="ttdb-kl">Peticiones</div>
+        <div class="ttdb-kv">${fmtN(pet)}</div>
+        <div class="ttdb-ksub">${pctN(pet,total)}% del total</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-grn">
+        <div class="ttdb-kl">Consultas</div>
+        <div class="ttdb-kv">${fmtN(cons)}</div>
+        <div class="ttdb-ksub">${pctN(cons,total)}% del total</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-amb">
+        <div class="ttdb-kl">Tendencia MoM</div>
+        <div class="ttdb-kv" style="font-size:22px;color:${momColor}">${momText}</div>
+        <div class="ttdb-ksub">${fmtN(countPrev)} vs ${fmtN(countPrev2)} (mes ant.)</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-acc" style="--c:#7c3aed">
+        <div class="ttdb-kl">En progreso</div>
+        <div class="ttdb-kv" style="color:#7c3aed">${fmtN(inp)}</div>
+        <div class="ttdb-ksub">activos ahora</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-rose">
+        <div class="ttdb-kl">⚠ En riesgo</div>
+        <div class="ttdb-kv">${fmtN(riesgo)}</div>
+        <div class="ttdb-ksub">InProgress · vence en &lt;48h</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-rose" style="opacity:.85">
+        <div class="ttdb-kl">Sin resolver</div>
+        <div class="ttdb-kv" style="font-size:22px">${tasaSinRes}%</div>
+        <div class="ttdb-ksub">${fmtN(sinResolver)} Cancelados + Vencidos</div>
+      </div>
     `;
   }
 
@@ -630,7 +730,20 @@
       const mNum = parseInt(m.slice(5));
       out += `<text x="${x+barW/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="#8a9bb0">${mNames[mNum]}</text>`;
       out += `<text x="${x+barW/2}" y="${H-4}" text-anchor="middle" font-size="7" fill="#c2cdd6">${m.slice(2,4)}</text>`;
-      if (barW>16 && tot>0) out += `<text x="${x+barW/2}" y="${padT+chartH-fullH-3}" text-anchor="middle" font-size="7" fill="#8a9bb0">${tot}</text>`;
+      // valor + delta MoM encima de la barra
+      if (tot > 0) {
+        const topY = padT + chartH - fullH - 3;
+        out += `<text x="${x+barW/2}" y="${topY}" text-anchor="middle" font-size="7" fill="#8a9bb0">${tot}</text>`;
+        if (i > 0) {
+          const prevTot = byM[months[i-1]].c + byM[months[i-1]].p;
+          if (prevTot > 0) {
+            const d = Math.round((tot - prevTot) / prevTot * 100);
+            const col = d > 10 ? "#e83e8c" : d < -10 ? "#00CFB9" : "#c2cdd6";
+            const sym = d >= 0 ? "▲" : "▼";
+            out += `<text x="${x+barW/2}" y="${topY - 8}" text-anchor="middle" font-size="6" fill="${col}">${sym}${Math.abs(d)}%</text>`;
+          }
+        }
+      }
     });
     svg.innerHTML = out;
   }
@@ -719,7 +832,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v3</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v4</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
@@ -829,6 +942,6 @@
   installNetworkHooks();
   installObserver();
   createPanel();
-  setOutput("✅ Listo (v3).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' para abrir el dashboard de volumetría.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.");
+  setOutput("✅ Listo (v4).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' para abrir el dashboard de volumetría.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.");
 
 })();
