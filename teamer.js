@@ -749,13 +749,63 @@
   const KEEPALIVE_ENDPOINT = "/devops/dashboardTeamer/bis/notifications/count/employees/id";
   let _keepaliveTimer = null;
 
+  // ── triggerPortalNav ───────────────────────────────────────────────
+  // Clicks an Angular router link in the portal page (under our overlay).
+  // The user sees nothing (our dashboard covers it at z-index:2147483640).
+  // The click fires Angular's router → route guards run → Angular HttpClient
+  // makes API calls through its interceptors → the OIDC interceptor detects
+  // an expired token and exchanges a new one silently (hidden iframe, prompt=none).
+  // We capture the resulting POST /token response in state.network as usual.
+  function triggerPortalNav() {
+    // Ordered from most specific (Angular routerLink) to generic href fallback.
+    // Exclude anything inside our own overlay.
+    const selectors = [
+      'a[routerlink]:not(#tt-dashboard *)',
+      '[routerlink]:not(#tt-dashboard *)',
+      'a[ng-reflect-router-link]:not(#tt-dashboard *)',
+      'teamer-menu a:not(#tt-dashboard *)',
+      'app-menu a:not(#tt-dashboard *)',
+      '#TeamerHeader a:not(#tt-dashboard *)',
+      'teamer-header a:not(#tt-dashboard *)',
+      `a[href*="${location.origin}"]:not(#tt-dashboard *)`,
+      `a[href^="/"]:not(#tt-dashboard *)`,
+    ];
+
+    for (const sel of selectors) {
+      let candidates;
+      try { candidates = [...document.querySelectorAll(sel)]; } catch { continue; }
+      // Prefer links that stay on the same origin
+      const el = candidates.find(a => {
+        const href = a.href || "";
+        return !href || href.startsWith(location.origin) || href.startsWith("/");
+      }) || candidates[0];
+      if (el) {
+        el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        log("[nav-refresh] clicked:", sel, el.href || el.textContent.trim().slice(0,30));
+        return true;
+      }
+    }
+
+    // Last resort: tickle Angular's router by dispatching a popstate.
+    // This makes Angular re-evaluate the current route's guards.
+    try {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: history.state }));
+      log("[nav-refresh] dispatched popstate fallback");
+    } catch {}
+    return false;
+  }
+
   function startKeepalive() {
     stopKeepalive();
     _keepaliveTimer = setInterval(async () => {
       try {
-        // Sin cabecera Authorization explícita: dejamos que el servidor use cookies.
-        // Añadir un token expirado aquí contaminaba state.network y bloqueaba
-        // waitForFreshToken, que busca el token más reciente en el log de red.
+        // Trigger Angular nav so its OIDC interceptor keeps the session alive.
+        // This is the primary mechanism — the HTTP ping below is secondary.
+        triggerPortalNav();
+
+        // Low-cost API ping (credentials:include sends session cookies).
+        // No explicit Authorization header to avoid poisoning state.network
+        // with a stale token that would fool waitForFreshToken.
         await window.fetch(`${CONFIG.dashboardApi}${KEEPALIVE_ENDPOINT}`, {
           credentials: "include",
           headers: { Accept: "application/json" },
@@ -769,16 +819,29 @@
     if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
 
-  // Espera hasta que aparezca un token DIFERENTE al actual.
-  // El intercambio PKCE (/token) suele completarse en < 400ms,
-  // así que polling a 200ms lo captura en el primer o segundo ciclo.
+  // ── waitForFreshToken ──────────────────────────────────────────────
+  // Waits until a token DIFFERENT from oldAuth appears in state.network.
+  // Actively triggers portal navigation on the first call so Angular's OIDC
+  // interceptor fires immediately rather than us waiting passively.
   function waitForFreshToken(oldAuth, timeoutMs = 25000) {
+    // Kick Angular's OIDC flow right away — don't just sit and poll.
+    triggerPortalNav();
+
     return new Promise(resolve => {
       const start = Date.now();
+      // Re-trigger nav every ~5 s in case the first click didn't land on a
+      // route that makes authenticated API calls (some routes are public).
+      const navIv = setInterval(() => triggerPortalNav(), 5000);
       const iv = setInterval(() => {
         const fresh = getAuth();
-        if (fresh && fresh !== oldAuth) { clearInterval(iv); resolve(fresh); return; }
-        if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
+        if (fresh && fresh !== oldAuth) {
+          clearInterval(iv); clearInterval(navIv);
+          resolve(fresh); return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(iv); clearInterval(navIv);
+          resolve(null);
+        }
       }, 200);
     });
   }
@@ -795,13 +858,13 @@
 
       if (res.status === 401 || res.status === 403) {
         if (attempt < 3) {
-          dashSetLoading(true, `Token expirado — esperando renovación del portal… (${attempt + 1}/3)`, null);
+          dashSetLoading(true, `Token expirado — navegando portal para renovar… (${attempt + 1}/3)`, null);
           const fresh = await waitForFreshToken(auth, 20000);
-          if (!fresh) throw new Error("No se pudo renovar el token — recarga la página del portal");
+          if (!fresh) throw new Error("No se pudo renovar el token — recarga la página manualmente");
           auth = fresh;
           continue;
         }
-        throw new Error(`${res.status} — token inválido tras 3 intentos de renovación`);
+        throw new Error(`${res.status} — token inválido tras 3 intentos`);
       }
 
       if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
@@ -840,6 +903,7 @@
     let page = 0, done = false, totalPages = null;
     dashSetLoading(true, "Cargando procesos…", 0);
     startKeepalive();   // ← mantener sesión activa durante toda la carga
+    triggerPortalNav(); // ← navegación proactiva al inicio para asegurar token fresco
 
     try {
       while (!done && !state.dash.cancel) {
@@ -1151,6 +1215,7 @@
     cons.items  = [];
     dashSetLoading(true, "Cargando consultas…", 0);
     startKeepalive();
+    triggerPortalNav(); // ← navegación proactiva al inicio
     let page = 0, done = false, totalPages = null;
     try {
       while (!done && !cons.cancel) {
@@ -2043,7 +2108,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 21:00</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 21:15</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
