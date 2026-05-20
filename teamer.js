@@ -355,6 +355,37 @@
 
   .ttdb-itip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#edf0f3;border:1px solid #c2cdd6;color:#8a9bb0;font-size:8px;font-weight:700;cursor:help;flex-shrink:0;vertical-align:middle;margin-left:5px;line-height:1;user-select:none}
   .ttdb-itip:hover{background:#00C4E9;color:#fff;border-color:#00C4E9}
+
+  .ttdb-net-main{padding:18px 24px;display:flex;flex-direction:column;gap:10px;flex:1;overflow-y:auto}
+  .ttdb-net-row{background:#fff;border:1px solid #dde3e8;border-radius:10px;overflow:hidden}
+  .ttdb-net-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none;gap:8px;flex-wrap:wrap}
+  .ttdb-net-head:hover{background:#f5f7f9}
+  .ttdb-net-method{font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;flex-shrink:0;letter-spacing:.5px}
+  .ttdb-net-m-get{background:#e0f7fa;color:#00838f}
+  .ttdb-net-m-post{background:#fff3e0;color:#e65100}
+  .ttdb-net-url{font-size:10px;font-family:monospace;color:#2c3050;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .ttdb-net-cnt{font-size:10px;font-weight:700;color:#8a9bb0;white-space:nowrap}
+  .ttdb-net-ms{font-size:9px;color:#c2cdd6;white-space:nowrap}
+  .ttdb-net-err{font-size:9px;color:#e83e8c;white-space:nowrap}
+  .ttdb-net-chev{font-size:9px;color:#c2cdd6;flex-shrink:0;transition:transform .2s}
+  .ttdb-net-row.open .ttdb-net-chev{transform:rotate(90deg)}
+  .ttdb-net-body{display:none;border-top:1px solid #f0f2f5;padding:12px 14px;gap:10px;flex-direction:column}
+  .ttdb-net-row.open .ttdb-net-body{display:flex}
+  .ttdb-net-sc{display:flex;gap:6px;flex-wrap:wrap}
+  .ttdb-sc-pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
+  .ttdb-sc-2{background:#e8f5e9;color:#2e7d32} .ttdb-sc-4{background:#fff3e0;color:#e65100} .ttdb-sc-5{background:#fce4ec;color:#c62828} .ttdb-sc-e{background:#f5f5f5;color:#616161}
+  .ttdb-net-fields{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+  .ttdb-fld{font-size:9px;background:#f5f7f9;border:1px solid #dde3e8;border-radius:4px;padding:2px 6px;color:#2c3050;font-family:monospace}
+  .ttdb-fld b{color:#7c3aed}
+  .ttdb-net-pre{background:#0d1117;color:#e6edf3;font-size:9px;font-family:monospace;line-height:1.5;padding:10px 12px;border-radius:6px;overflow:auto;max-height:240px;white-space:pre;margin:0}
+  .ttdb-net-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#8a9bb0;margin-bottom:4px}
+
+  .ttdb-thist-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:10px}
+  .ttdb-thist-lbl{width:60px;flex-shrink:0;color:#8a9bb0;text-align:right;font-size:9px}
+  .ttdb-thist-bar-wrap{flex:1;height:14px;background:#edf0f3;border-radius:3px;overflow:hidden}
+  .ttdb-thist-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+  .ttdb-thist-val{width:36px;text-align:right;font-weight:700;color:#2c3050;flex-shrink:0;font-size:10px}
+  .ttdb-thist-pct{width:28px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0}
   `;
 
   function injectDashboardStyle() {
@@ -389,6 +420,7 @@
       <div class="ttdb-nav">
         <div class="ttdb-ntab active" id="ttdb-nt-vol"  onclick="window.__teamerToolkit._dashNav('vol',this)">📊 Volumetría</div>
         <div class="ttdb-ntab"        id="ttdb-nt-cons" onclick="window.__teamerToolkit._dashNav('cons',this)">💬 Consultas</div>
+        <div class="ttdb-ntab"        id="ttdb-nt-net"  onclick="window.__teamerToolkit._dashNav('net',this)">📡 API</div>
       </div>
 
       <div class="ttdb-loading" id="ttdb-loading">
@@ -470,6 +502,22 @@
           <div id="ttdb-cons-services"></div>
         </div>
 
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Apertura vs Cierre</span>${ttip("Azul: consultas abiertas ese mes (initDate). Verde: consultas cerradas ese mes (endDate). Si cierre > apertura el backlog se reduce. Fuente: topics list.")}
+            <div class="ttdb-tabs">
+              <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashConsWindow(12,this)">12m</div>
+              <div class="ttdb-tab" onclick="window.__teamerToolkit._dashConsWindow(6,this)">6m</div>
+              <div class="ttdb-tab" onclick="window.__teamerToolkit._dashConsWindow(3,this)">3m</div>
+            </div>
+          </div>
+          <div class="ttdb-legend">
+            <div class="ttdb-leg"><div class="ttdb-leg-dot" style="background:#00C4E9"></div>Abiertos</div>
+            <div class="ttdb-leg"><div class="ttdb-leg-dot" style="background:#00CFB9"></div>Cerrados</div>
+          </div>
+          <div class="ttdb-chart-scroll"><svg id="ttdb-cons-openclose" style="display:block;width:100%;min-width:480px" height="180"></svg></div>
+        </div>
+
         <div class="ttdb-row2">
           <div class="ttdb-card">
             <div class="ttdb-card-title">
@@ -495,6 +543,21 @@
               </svg>
               <div class="ttdb-dlegend" id="ttdb-cons-dlegend"></div>
             </div>
+          </div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Tiempo de resolución</span>${ttip("Distribución de (endDate − initDate) en los topics cerrados. Solo items con endDate. Buckets: &lt;2h / 2-24h / 1-3d / 3-7d / 7-30d / &gt;30d. Fuente: topics list.")}
+            </div>
+            <div id="ttdb-cons-timehist"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>T. medio por servicio</span>${ttip("Promedio de horas de resolución (endDate − initDate) por resolverITService. Solo topics cerrados con endDate. Aplica filtro de servicio.")}
+            </div>
+            <div id="ttdb-cons-timebysvc"></div>
           </div>
         </div>
 
@@ -534,6 +597,20 @@
             <div class="ttdb-cplx" id="ttdb-cons-cplx"></div>
           </div>
         </div>
+      </div>
+
+      <div class="ttdb-net-main" id="ttdb-net-main" style="display:none">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:4px">
+          <span style="font-size:10px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:1px">Filtro</span>
+          <div class="ttdb-tabs" style="margin-left:0">
+            <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashNetFilter('all',this)">Todo</div>
+            <div class="ttdb-tab" onclick="window.__teamerToolkit._dashNetFilter('api',this)">api.pro</div>
+            <div class="ttdb-tab" onclick="window.__teamerToolkit._dashNetFilter('errors',this)">Errores</div>
+          </div>
+          <span id="ttdb-net-count" style="font-size:10px;color:#8a9bb0;flex:1"></span>
+          <button class="ttdb-btn ttdb-btn-close" style="padding:4px 10px;font-size:10px" onclick="window.__teamerToolkit._dashNetRefresh()">↺ Actualizar</button>
+        </div>
+        <div id="ttdb-net-list"></div>
       </div>
     `;
 
@@ -1112,9 +1189,12 @@
 
     const months = dashBuildMonths(cons.windowM);
     dashRenderConsultasKPIs(filtered);
+    dashRenderOpenClose(filtered, months);
     dashRenderServiceBars(inPeriod);
     dashRenderConsultasBar(filtered, months);
     dashRenderFeedbackDonut(filtered);
+    dashRenderTimeHist(filtered);
+    dashRenderTimeByService(filtered);
     dashRenderFeedbackTrend(filtered, months);
     dashRenderRequesters(filtered);
     dashRenderClosureTypes(filtered);
@@ -1288,6 +1368,110 @@
     }).join("");
   }
 
+  function dashRenderOpenClose(items, months) {
+    const svg = document.getElementById("ttdb-cons-openclose");
+    if (!svg) return;
+    const byM = {};
+    months.forEach(m => { byM[m] = { open:0, close:0 }; });
+    items.forEach(i => {
+      if (byM[i.month]) byM[i.month].open++;
+      if (i.endDate) {
+        const cm = i.endDate.slice(0,7);
+        if (byM[cm]) byM[cm].close++;
+      }
+    });
+    const maxV = Math.max(1, ...months.map(m => Math.max(byM[m].open, byM[m].close)));
+    const H=180, padT=16, padB=30, padL=32, padR=8, chartH=H-padT-padB;
+    const W = svg.parentElement ? (svg.parentElement.clientWidth||700) : 700;
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const n = months.length, step=(W-padL-padR)/n, grpW=Math.min(step-4, 32), bW=Math.floor(grpW/2)-1;
+    const mNames=["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    let out="";
+    for (let t=0;t<=4;t++) {
+      const y = padT+chartH-(t/4)*chartH;
+      out += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#dde3e8" stroke-width="1"/>`;
+      out += `<text x="${padL-4}" y="${y+3}" text-anchor="end" font-size="8" fill="#8a9bb0">${Math.round(t/4*maxV)}</text>`;
+    }
+    months.forEach((m,i) => {
+      const cx = padL + i*step + step/2;
+      const {open,close} = byM[m];
+      const oH = open/maxV*chartH, cH = close/maxV*chartH;
+      const x0 = cx - grpW/2, x1 = x0 + bW + 1;
+      if (oH>0) out+=`<rect x="${x0}" y="${padT+chartH-oH}" width="${bW}" height="${oH}" fill="#00C4E9" rx="2"/>`;
+      if (cH>0) out+=`<rect x="${x1}" y="${padT+chartH-cH}" width="${bW}" height="${cH}" fill="#00CFB9" rx="2"/>`;
+      const mNum=parseInt(m.slice(5));
+      out+=`<text x="${cx}" y="${H-14}" text-anchor="middle" font-size="8" fill="#8a9bb0">${mNames[mNum]}</text>`;
+      out+=`<text x="${cx}" y="${H-4}" text-anchor="middle" font-size="7" fill="#c2cdd6">${m.slice(2,4)}</text>`;
+      if (open>0) out+=`<text x="${x0+bW/2}" y="${padT+chartH-oH-3}" text-anchor="middle" font-size="7" fill="#00C4E9">${open}</text>`;
+      if (close>0) out+=`<text x="${x1+bW/2}" y="${padT+chartH-cH-3}" text-anchor="middle" font-size="7" fill="#00CFB9">${close}</text>`;
+      // net indicator
+      const net = close-open;
+      if (net!==0) out+=`<text x="${cx}" y="${padT+chartH+10}" text-anchor="middle" font-size="7" fill="${net>0?"#00CFB9":"#e83e8c"}">${net>0?"+":""}${net}</text>`;
+    });
+    svg.innerHTML = out;
+  }
+
+  function dashRenderTimeHist(items) {
+    const el = document.getElementById("ttdb-cons-timehist");
+    if (!el) return;
+    const buckets = [
+      { lbl:"< 2h",   max:2,       color:"#00CFB9" },
+      { lbl:"2h–1d",  max:24,      color:"#00C4E9" },
+      { lbl:"1–3d",   max:72,      color:"#7c3aed" },
+      { lbl:"3–7d",   max:168,     color:"#f4c53d" },
+      { lbl:"7–30d",  max:720,     color:"#e07b39" },
+      { lbl:"> 30d",  max:Infinity,color:"#e83e8c" },
+    ];
+    const counts = buckets.map(() => 0);
+    let total = 0;
+    items.forEach(i => {
+      if (!i.endDate || !i.initDate) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      total++;
+      for (let b = 0; b < buckets.length; b++) {
+        if (h < buckets[b].max) { counts[b]++; break; }
+      }
+    });
+    if (!total) { el.innerHTML=`<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos de cierre</div>`; return; }
+    const maxC = Math.max(...counts, 1);
+    el.innerHTML = buckets.map((b,i) =>
+      `<div class="ttdb-thist-row">
+        <div class="ttdb-thist-lbl">${b.lbl}</div>
+        <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
+        <div class="ttdb-thist-val">${counts[i]}</div>
+        <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
+      </div>`
+    ).join("");
+  }
+
+  function dashRenderTimeByService(items) {
+    const el = document.getElementById("ttdb-cons-timebysvc");
+    if (!el) return;
+    const svcH = {};
+    items.forEach(i => {
+      if (!i.endDate || !i.initDate) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      if (!svcH[i.resolverService]) svcH[i.resolverService] = [];
+      svcH[i.resolverService].push(h);
+    });
+    const avgs = Object.entries(svcH)
+      .map(([s,hs]) => [s, hs.reduce((a,b)=>a+b,0)/hs.length, hs.length])
+      .sort((a,b)=>a[1]-b[1]).slice(0,10);
+    if (!avgs.length) { el.innerHTML=`<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos</div>`; return; }
+    const maxA = avgs[avgs.length-1][1]||1;
+    const fmtH = h => h<1 ? "<1h" : h<24 ? Math.round(h)+"h" : (h/24).toFixed(1)+"d";
+    el.innerHTML = avgs.map(([s,avg,cnt]) =>
+      `<div class="ttdb-thist-row">
+        <div class="ttdb-thist-lbl" style="width:90px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s}">${s}</div>
+        <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(avg/maxA*100)}%;background:#7c3aed"></div></div>
+        <div class="ttdb-thist-val" style="width:40px">${fmtH(avg)}</div>
+        <div class="ttdb-thist-pct" style="width:32px;color:#c2cdd6">${cnt}×</div>
+      </div>`
+    ).join("");
+  }
+
   function dashRenderFeedbackTrend(items, months) {
     const svg = document.getElementById("ttdb-cons-fb-trend");
     if (!svg) return;
@@ -1383,6 +1567,68 @@
     }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
 
+  // ── Network / API Explorer ─────────────────────────────────────────
+  function renderNetExplorer() {
+    const el = document.getElementById("ttdb-net-list");
+    const cntEl = document.getElementById("ttdb-net-count");
+    if (!el) return;
+    const filter = state.dash.netFilter || "all";
+    let patterns = Object.values(state.byPattern);
+    if (filter === "api")    patterns = patterns.filter(p => p.pattern.includes("api.pro.internal") || p.pattern.includes("api.pro.caixabank"));
+    if (filter === "errors") patterns = patterns.filter(p => p.errors > 0);
+    patterns.sort((a,b) => b.count - a.count);
+    if (cntEl) cntEl.textContent = `${patterns.length} endpoint${patterns.length!==1?"s":""} · ${state.network.length} llamadas`;
+    if (!patterns.length) {
+      el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a9bb0;font-size:12px">Sin llamadas capturadas. Navega por el portal para capturarlas.</div>`;
+      return;
+    }
+    const mColor = m => m==="GET"?"ttdb-net-m-get":m==="POST"?"ttdb-net-m-post":"ttdb-sc-e";
+    el.innerHTML = patterns.map((p, idx) => {
+      const avgMs = p.count ? Math.round(p.totalMs/p.count) : 0;
+      const errPct = p.count ? Math.round(p.errors/p.count*100) : 0;
+      const scBadges = Object.entries(p.statusCodes).map(([s,c]) => {
+        const cls = s[0]==="2"?"ttdb-sc-2":s[0]==="4"?"ttdb-sc-4":s[0]==="5"?"ttdb-sc-5":"ttdb-sc-e";
+        return `<span class="ttdb-sc-pill ${cls}">${s} ×${c}</span>`;
+      }).join("");
+      // best example: last one with resBody
+      const ex = [...p.examples].reverse().find(e=>e.resBody) || p.examples[p.examples.length-1];
+      const body = ex?.resBody;
+      // response field pills
+      let fieldHtml = "";
+      if (body && typeof body === "object") {
+        const keys = body.content ? Object.keys(body.content[0]||{}) : Object.keys(body);
+        fieldHtml = keys.slice(0,12).map(k => {
+          const v = body.content ? body.content[0]?.[k] : body[k];
+          const preview = v===null?"null":Array.isArray(v)?`[${v.length}]`:typeof v==="object"&&v?`{…}`:(String(v)).slice(0,18);
+          return `<span class="ttdb-fld">${k}: <b>${preview}</b></span>`;
+        }).join("");
+        if (body.content) fieldHtml = `<span class="ttdb-fld">total: <b>${body.totalElements}</b></span> <span class="ttdb-fld">pages: <b>${body.totalPages}</b></span> ` + fieldHtml;
+      }
+      const qpKeys = p.queryParamKeys instanceof Set ? [...p.queryParamKeys] : (p.queryParamKeys||[]);
+      const sample = body ? JSON.stringify(body,null,2).slice(0,1200)+(JSON.stringify(body).length>1200?"\n…":"") : (ex?.resBody||"(sin body)");
+      const urlShort = p.pattern
+        .replace("https://api.pro.internal.caixabank.com","[API]")
+        .replace("https://apicollector.pro.internal.caixabank.com","[COLLECTOR]")
+        .replace(/https?:\/\/[^/]+/,"[PORTAL]");
+      return `<div class="ttdb-net-row" id="ttdb-nr-${idx}">
+        <div class="ttdb-net-head" onclick="window.__teamerToolkit._dashNetExpand(${idx})">
+          <span class="ttdb-net-method ${mColor(p.method)}">${p.method}</span>
+          <span class="ttdb-net-url" title="${p.pattern}">${urlShort}</span>
+          <span class="ttdb-net-cnt">${p.count} call${p.count!==1?"s":""}</span>
+          <span class="ttdb-net-ms">${avgMs}ms</span>
+          ${p.errors?`<span class="ttdb-net-err">⚠ ${errPct}% err</span>`:""}
+          <span class="ttdb-net-chev">▶</span>
+        </div>
+        <div class="ttdb-net-body">
+          <div class="ttdb-net-sc">${scBadges}</div>
+          ${qpKeys.length?`<div><span class="ttdb-net-section">Query params</span><div class="ttdb-net-fields">${qpKeys.map(k=>`<span class="ttdb-fld">${k}</span>`).join("")}</div></div>`:""}
+          ${fieldHtml?`<div><span class="ttdb-net-section">Campos response</span><div class="ttdb-net-fields">${fieldHtml}</div></div>`:""}
+          <div><span class="ttdb-net-section">Último response</span><pre class="ttdb-net-pre">${String(sample).replace(/</g,"&lt;")}</pre></div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
   // ── Public dashboard controls ──────────────────────────────────────
   window.__teamerToolkit._dashClose      = closeDashboard;
   window.__teamerToolkit._dashDemo       = () => {
@@ -1397,31 +1643,43 @@
     el.classList.add("active");
     const main  = document.getElementById("ttdb-main");
     const cmain = document.getElementById("ttdb-cons-main");
+    const nmain = document.getElementById("ttdb-net-main");
+    [main,cmain,nmain].forEach(e => { if(e) e.style.display="none"; });
     if (tab === "vol") {
-      if (main)  main.style.display  = "";
-      if (cmain) cmain.style.display = "none";
-    } else {
-      if (main)  main.style.display  = "none";
-      if (cmain) {
-        cmain.style.display = "flex";
-        if (!state.dash.cons.loaded) {
-          cmain.style.display = "none";
-          loadConsultasData();
-        } else {
-          renderConsultas();
-          // redraw SVG after display:flex
-          setTimeout(() => dashRenderConsultasBar(
-            state.dash.cons.items.filter(i => {
-              const c = new Date(); c.setFullYear(c.getFullYear()-1);
-              const svc = state.dash.cons.serviceFilter;
-              return new Date(i.initDate) >= c && (svc==="all" || i.resolverService===svc);
-            }),
-            dashBuildMonths(state.dash.cons.windowM)
-          ), 50);
-        }
+      if (main) main.style.display = "";
+    } else if (tab === "cons") {
+      if (!state.dash.cons.loaded) {
+        loadConsultasData();
+      } else {
+        if (cmain) cmain.style.display = "flex";
+        renderConsultas();
+        setTimeout(() => {
+          const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+          const svc = state.dash.cons.serviceFilter;
+          const f = state.dash.cons.items.filter(i => new Date(i.initDate)>=cutoff && (svc==="all"||i.resolverService===svc));
+          const months = dashBuildMonths(state.dash.cons.windowM);
+          dashRenderOpenClose(f, months);
+          dashRenderConsultasBar(f, months);
+          dashRenderFeedbackTrend(f, months);
+        }, 50);
       }
+    } else if (tab === "net") {
+      if (nmain) nmain.style.display = "flex";
+      renderNetExplorer();
     }
   };
+
+  window.__teamerToolkit._dashNetFilter = (f, el) => {
+    el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t=>t.classList.remove("active"));
+    el.classList.add("active");
+    state.dash.netFilter = f;
+    renderNetExplorer();
+  };
+  window.__teamerToolkit._dashNetExpand = (idx) => {
+    const row = document.getElementById("ttdb-nr-"+idx);
+    if (row) row.classList.toggle("open");
+  };
+  window.__teamerToolkit._dashNetRefresh = () => renderNetExplorer();
 
   window.__teamerToolkit._dashSvcFilter = (svc) => {
     state.dash.cons.serviceFilter = svc;
@@ -1453,6 +1711,7 @@
       new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc)
     );
     const months = dashBuildMonths(n);
+    dashRenderOpenClose(f, months);
     dashRenderConsultasBar(f, months);
     dashRenderFeedbackTrend(f, months);
   };
@@ -1493,7 +1752,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 17:24</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 19:36</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
