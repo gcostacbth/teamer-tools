@@ -21,6 +21,7 @@
     apiTimeoutMs: 10000,
     skipExtensions: /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|map|webp|avif)(\?|$)/i,
     dashboardApi: "https://api.pro.internal.caixabank.com",
+    dashPageSize: 3000,  // la API devolverá lo que acepte; se ajusta automáticamente
   };
 
   const state = {
@@ -420,15 +421,44 @@
   }
 
   // ── Dashboard data loading ──────────────────────────────────────────
+
+  // Espera hasta que aparezca un token más nuevo que `oldAuth` en el network log.
+  // El portal renueva el JWT en background (telemetría, polls) cada pocos segundos.
+  function waitForFreshToken(oldAuth, timeoutMs = 20000) {
+    return new Promise(resolve => {
+      const start = Date.now();
+      const iv = setInterval(() => {
+        const fresh = getAuth();
+        if (fresh && fresh !== oldAuth) { clearInterval(iv); resolve(fresh); return; }
+        if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
+      }, 500);
+    });
+  }
+
   async function dashApiFetch(path, params) {
     const qs  = new URLSearchParams(params).toString();
     const url = `${CONFIG.dashboardApi}${path}${qs ? "?" + qs : ""}`;
-    const auth = getAuth();
-    const headers = { "Accept": "application/json" };
-    if (auth) headers["Authorization"] = auth;
-    const res = await (state.origFetch || fetch)(url, { credentials: "include", headers });
-    if (!res.ok) throw new Error(`${res.status} — ${path}`);
-    return res.json();
+
+    let auth = getAuth();
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const headers = { "Accept": "application/json" };
+      if (auth) headers["Authorization"] = auth;
+      const res = await (state.origFetch || fetch)(url, { credentials: "include", headers });
+
+      if (res.status === 401 || res.status === 403) {
+        if (attempt < 3) {
+          dashSetLoading(true, `Token expirado — esperando renovación del portal… (${attempt + 1}/3)`, null);
+          const fresh = await waitForFreshToken(auth, 20000);
+          if (!fresh) throw new Error("No se pudo renovar el token — recarga la página del portal");
+          auth = fresh;
+          continue;
+        }
+        throw new Error(`${res.status} — token inválido tras 3 intentos de renovación`);
+      }
+
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${path}`);
+      return res.json();
+    }
   }
 
   function dashSetLoading(on, text, pct) {
@@ -464,8 +494,13 @@
 
     try {
       while (!done && !state.dash.cancel) {
-        const data = await dashApiFetch("/devops/bis/1/my-processes", { user:"*", page, size:100 });
-        if (totalPages === null) totalPages = data.totalPages;
+        const data = await dashApiFetch("/devops/bis/1/my-processes", { user:"*", page, size: CONFIG.dashPageSize });
+        // La API puede devolver menos elementos de los pedidos — ajustar el tamaño real
+        if (totalPages === null) {
+          const actualSize = data.size || CONFIG.dashPageSize;
+          if (actualSize < CONFIG.dashPageSize) CONFIG.dashPageSize = actualSize;
+          totalPages = data.totalPages;
+        }
 
         for (const item of (data.content || [])) {
           const d = new Date(item.processInitDate);
