@@ -932,7 +932,8 @@
         });
         if (totalPages === null) totalPages = data.totalPages;
         for (const item of (data.content || [])) {
-          const d = new Date(item.initDate);
+          const d = item.initDate ? new Date(item.initDate) : null;
+          if (!d || isNaN(d.getTime())) continue;   // skip items with no/bad date
           cons.items.push({
             id:             item.processInstanceId,
             month:          d.toISOString().slice(0, 7),
@@ -1050,7 +1051,7 @@
     const withFB  = closed.filter(i => i.closureReason === "Resolved with feedback").length;
     const noFB    = closed.filter(i => i.closureReason === "Inactivity without feedback").length;
     const fbRate  = closed.length ? Math.round(withFB / closed.length * 100) : null;
-    const resTimes= items.filter(i => i.endDate && i.initDate).map(i => new Date(i.endDate)-new Date(i.initDate));
+    const resTimes= items.filter(i => i.endDate && i.initDate).map(i => new Date(i.endDate)-new Date(i.initDate)).filter(ms => isFinite(ms) && ms >= 0);
     const avgMs   = resTimes.length ? resTimes.reduce((a,b)=>a+b,0)/resTimes.length : null;
     const limit48 = new Date(now.getTime() + 48*3600000);
     const riesgo  = items.filter(i => i.status === "IN_PROGRESS" && i.taskDueDate && new Date(i.taskDueDate) <= limit48).length;
@@ -1304,7 +1305,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 16:33</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 16:43</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
