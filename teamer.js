@@ -327,6 +327,27 @@
   .ttdb-type-bar-wrap{width:100px;flex-shrink:0;height:5px;background:#edf0f3;border-radius:3px;overflow:hidden}
   .ttdb-type-bar-fill{height:100%;border-radius:3px;background:#7c3aed;transition:width .5s}
   .ttdb-type-count{width:32px;text-align:right;font-weight:700;color:#8a9bb0;flex-shrink:0}
+
+  .ttdb-nav{display:flex;gap:0;background:#fff;border-bottom:2px solid #dde3e8;padding:0 24px;flex-shrink:0}
+  .ttdb-ntab{font-size:11px;font-weight:700;padding:10px 18px;cursor:pointer;color:#8a9bb0;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;user-select:none;white-space:nowrap}
+  .ttdb-ntab:hover{color:#2c3050}
+  .ttdb-ntab.active{color:#2c3050;border-bottom-color:#00C4E9}
+
+  .ttdb-svc-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0 4px}
+  .ttdb-svc-select{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid #dde3e8;background:#fff;color:#2c3050;cursor:pointer;min-width:220px}
+  .ttdb-svc-select:focus{outline:2px solid #00C4E9;border-color:#00C4E9}
+  .ttdb-cons-main{padding:18px 24px;display:flex;flex-direction:column;gap:14px;flex:1}
+
+  .ttdb-cplx{display:flex;gap:8px;flex-wrap:wrap}
+  .ttdb-cplx-item{flex:1;min-width:90px;background:#f5f7f9;border:1px solid #dde3e8;border-radius:8px;padding:10px 12px;text-align:center}
+  .ttdb-cplx-val{font-size:22px;font-weight:800;line-height:1}
+  .ttdb-cplx-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.3px;color:#8a9bb0;margin-top:4px}
+
+  .ttdb-itip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#edf0f3;border:1px solid #c2cdd6;color:#8a9bb0;font-size:8px;font-weight:700;cursor:help;position:relative;flex-shrink:0;vertical-align:middle;margin-left:5px;line-height:1;user-select:none}
+  .ttdb-itip:hover{background:#00C4E9;color:#fff;border-color:#00C4E9}
+  .ttdb-tip{display:none;position:absolute;top:calc(100% + 5px);left:0;width:240px;background:#000026;color:#fff;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.55;padding:8px 11px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.35);z-index:9999999;pointer-events:none;white-space:normal;text-align:left}
+  .ttdb-tip::before{content:'';position:absolute;bottom:100%;left:10px;border:5px solid transparent;border-bottom-color:#000026}
+  .ttdb-itip:hover .ttdb-tip{display:block}
   `;
 
   function injectDashboardStyle() {
@@ -358,6 +379,11 @@
         </div>
       </div>
 
+      <div class="ttdb-nav">
+        <div class="ttdb-ntab active" id="ttdb-nt-vol"  onclick="window.__teamerToolkit._dashNav('vol',this)">📊 Volumetría</div>
+        <div class="ttdb-ntab"        id="ttdb-nt-cons" onclick="window.__teamerToolkit._dashNav('cons',this)">💬 Consultas</div>
+      </div>
+
       <div class="ttdb-loading" id="ttdb-loading">
         <div class="ttdb-spinner"></div>
         <span id="ttdb-loading-text">Cargando…</span>
@@ -373,7 +399,7 @@
 
         <div class="ttdb-card">
           <div class="ttdb-card-title">
-            <span>Volumen mensual</span>
+            <span>Volumen mensual</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Agrupación por mes de processInitDate. Azul: Consultas · Morado: Peticiones. El % encima de cada barra es el cambio vs el mes anterior (MoM delta).</span></span>
             <div class="ttdb-tabs">
               <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashWindow(12,this)">12m</div>
               <div class="ttdb-tab" onclick="window.__teamerToolkit._dashWindow(6,this)">6m</div>
@@ -388,13 +414,13 @@
         </div>
 
         <div class="ttdb-card">
-          <div class="ttdb-card-title"><span>Por categoría</span></div>
+          <div class="ttdb-card-title"><span>Por categoría</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Campo categoryDescription de cada proceso. 6 categorías del portal (101-Consultas, 61-Ticketing, 81-Operación, 3-Aprovisionamiento, 21-Ciclo de vida, 141-Plataforma Cognitiva). Fuente: GET /devops/bis/1/categories.</span></span></div>
           <div id="ttdb-cats"></div>
         </div>
 
         <div class="ttdb-row2">
           <div class="ttdb-card">
-            <div class="ttdb-card-title"><span>Estado</span></div>
+            <div class="ttdb-card-title"><span>Estado</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Distribución de processStatus: InProgress (activos), Cancelled (cerrados sin resolver), Expired (SLA vencido). Campo processStatus de GET /devops/bis/1/my-processes.</span></span></div>
             <div class="ttdb-donut-wrap">
               <svg id="ttdb-donut" width="100" height="100" viewBox="0 0 100 100" style="flex-shrink:0">
                 <circle cx="50" cy="50" r="36" fill="none" stroke="#edf0f3" stroke-width="16"/>
@@ -407,7 +433,7 @@
           </div>
           <div class="ttdb-card">
             <div class="ttdb-card-title">
-              <span>Top tipos</span>
+              <span>Top tipos</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Campo requestTypeDescription de cada proceso (sin prefijo [ID]). Top 10 tipos más frecuentes del periodo. Filtrable por Consultas / Peticiones. Fuente: GET /devops/bis/1/my-processes.</span></span>
               <div class="ttdb-tabs">
                 <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashTypeFilter('all',this)">Todos</div>
                 <div class="ttdb-tab" onclick="window.__teamerToolkit._dashTypeFilter('consulta',this)">Consultas</div>
@@ -418,13 +444,68 @@
           </div>
         </div>
       </div>
+
+      <div class="ttdb-cons-main" id="ttdb-cons-main" style="display:none">
+        <div class="ttdb-svc-filter">
+          <span style="font-size:10px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:1px;white-space:nowrap">Servicio</span>
+          <select class="ttdb-svc-select" id="ttdb-svc-select" onchange="window.__teamerToolkit._dashSvcFilter(this.value)">
+            <option value="all">Todos los servicios</option>
+          </select>
+          <span id="ttdb-cons-count" style="font-size:10px;color:#8a9bb0"></span>
+        </div>
+
+        <div class="ttdb-kpis" id="ttdb-cons-kpis"></div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Distribución por servicio</span>${ttip("Campo resolverITService de cada consulta (topic). Muestra volumen total del periodo independientemente del filtro seleccionado. GET /devops/processApplication/bis/topics.")}
+          </div>
+          <div id="ttdb-cons-services"></div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Tendencia mensual</span>${ttip("Consultas agrupadas por mes de initDate. Aplica el filtro de servicio seleccionado. GET /devops/processApplication/bis/topics.")}
+              <div class="ttdb-tabs">
+                <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashConsWindow(12,this)">12m</div>
+                <div class="ttdb-tab" onclick="window.__teamerToolkit._dashConsWindow(6,this)">6m</div>
+                <div class="ttdb-tab" onclick="window.__teamerToolkit._dashConsWindow(3,this)">3m</div>
+              </div>
+            </div>
+            <div class="ttdb-chart-scroll"><svg id="ttdb-cons-bar" style="display:block;width:100%;min-width:280px" height="160"></svg></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Feedback</span>${ttip("Campo closureReason: \"Resolved with feedback\" = cerrado con respuesta del usuario. \"Inactivity without feedback\" = cerrado por inactividad. Pendiente = IN_PROGRESS aún abierto.")}
+            </div>
+            <div class="ttdb-donut-wrap">
+              <svg id="ttdb-cons-donut" width="90" height="90" viewBox="0 0 100 100" style="flex-shrink:0">
+                <circle cx="50" cy="50" r="36" fill="none" stroke="#edf0f3" stroke-width="16"/>
+                <g id="ttdb-cons-donut-arcs"></g>
+                <text x="50" y="46" text-anchor="middle" font-size="14" font-weight="800" fill="#000026" id="ttdb-cons-donut-total">—</text>
+                <text x="50" y="58" text-anchor="middle" font-size="7" fill="#8a9bb0">total</text>
+              </svg>
+              <div class="ttdb-dlegend" id="ttdb-cons-dlegend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Complejidad</span>${ttip("Campo complexity de los topics cerrados (COMPLETED + RESOLVED). LOW / MEDIUM / HIGH. Solo disponible tras resolución. Aplica el filtro de servicio.")}
+          </div>
+          <div class="ttdb-cplx" id="ttdb-cons-cplx"></div>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(ov);
-    state.dash.overlay  = ov;
-    state.dash.windowM  = 12;
+    state.dash.overlay    = ov;
+    state.dash.windowM    = 12;
     state.dash.typeFilter = "all";
-    state.dash.items    = [];
+    state.dash.items      = [];
+    state.dash.cons = { items:[], serviceFilter:"all", windowM:12, loaded:false, cancel:false };
 
     loadDashData();
   }
@@ -665,6 +746,10 @@
   function fmtN(n)  { return n >= 1000 ? (n/1000).toFixed(1)+"k" : String(n); }
   function pctN(a,b){ return b ? Math.round(a/b*100) : 0; }
 
+  function ttip(text) {
+    return `<span class="ttdb-itip">i<span class="ttdb-tip">${text}</span></span>`;
+  }
+
   function dashRenderKPIs(items) {
     const el = document.getElementById("ttdb-kpis");
     if (!el) return;
@@ -703,37 +788,37 @@
 
     el.innerHTML = `
       <div class="ttdb-kcard ttdb-kc-acc">
-        <div class="ttdb-kl">Total periodo</div>
+        <div class="ttdb-kl">Total periodo${ttip("GET /devops/bis/1/my-processes?user=*&amp;size=3000 · Campo: processInitDate filtrado a los últimos 12 meses. Incluye todos los estados y categorías.")}</div>
         <div class="ttdb-kv">${fmtN(total)}</div>
         <div class="ttdb-ksub">${fmtN(hoy)} hoy · ${fmtN(semana)} esta semana</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-pur">
-        <div class="ttdb-kl">Peticiones</div>
+        <div class="ttdb-kl">Peticiones${ttip("Procesos cuyo campo categoryDescription ≠ \"Consultas\". Incluye: Ticketing/Nuevo SAI, Operación, Aprovisionamiento de Infraestructura, Ciclo de vida de aplicación, Plataforma Cognitiva.")}</div>
         <div class="ttdb-kv">${fmtN(pet)}</div>
         <div class="ttdb-ksub">${pctN(pet,total)}% del total</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-grn">
-        <div class="ttdb-kl">Consultas</div>
+        <div class="ttdb-kl">Consultas${ttip("Procesos con categoryDescription = \"Consultas\" (category-id: 101). Fuente: campo categoryDescription de my-processes. Categorías via GET /devops/bis/1/categories.")}</div>
         <div class="ttdb-kv">${fmtN(cons)}</div>
         <div class="ttdb-ksub">${pctN(cons,total)}% del total</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-amb">
-        <div class="ttdb-kl">Tendencia MoM</div>
+        <div class="ttdb-kl">Tendencia MoM${ttip("(mes_n−1 − mes_n−2) / mes_n−2 × 100. Compara los dos últimos meses completos, evitando el mes actual (incompleto). Campo: processInitDate agrupado por mes.")}</div>
         <div class="ttdb-kv" style="font-size:22px;color:${momColor}">${momText}</div>
         <div class="ttdb-ksub">${fmtN(countPrev)} vs ${fmtN(countPrev2)} (mes ant.)</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-acc" style="--c:#7c3aed">
-        <div class="ttdb-kl">En progreso</div>
+        <div class="ttdb-kl">En progreso${ttip("Procesos con processStatus = \"InProgress\". Procesos activos (abiertos) dentro del periodo. Campo processStatus de GET /devops/bis/1/my-processes.")}</div>
         <div class="ttdb-kv" style="color:#7c3aed">${fmtN(inp)}</div>
         <div class="ttdb-ksub">activos ahora</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-rose">
-        <div class="ttdb-kl">⚠ En riesgo</div>
+        <div class="ttdb-kl">⚠ En riesgo${ttip("InProgress con processDueDate ≤ ahora + 48h. Procesos activos que vencen en menos de 48 horas o ya han vencido. Campo: processDueDate de my-processes.")}</div>
         <div class="ttdb-kv">${fmtN(riesgo)}</div>
         <div class="ttdb-ksub">InProgress · vence en &lt;48h</div>
       </div>
       <div class="ttdb-kcard ttdb-kc-rose" style="opacity:.85">
-        <div class="ttdb-kl">Sin resolver</div>
+        <div class="ttdb-kl">Sin resolver${ttip("(Cancelados + Vencidos) / Total × 100. Cancelled: cerrado sin resolución. Expired: venció el SLA sin resolverse. Campos processStatus de my-processes.")}</div>
         <div class="ttdb-kv" style="font-size:22px">${tasaSinRes}%</div>
         <div class="ttdb-ksub">${fmtN(sinResolver)} Cancelados + Vencidos</div>
       </div>
@@ -832,10 +917,356 @@
     ).join("") || `<div style="text-align:center;padding:20px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
 
+  // ── Consultas (Topics) data loading ───────────────────────────────
+  async function loadConsultasData() {
+    const cons = state.dash.cons;
+    cons.cancel = false;
+    cons.items  = [];
+    dashSetLoading(true, "Cargando consultas…", 0);
+    startKeepalive();
+    let page = 0, done = false, totalPages = null;
+    try {
+      while (!done && !cons.cancel) {
+        const data = await dashApiFetch("/devops/processApplication/bis/topics", {
+          page, size: 200, status: "COMPLETED,RESOLVED,IN_PROGRESS"
+        });
+        if (totalPages === null) totalPages = data.totalPages;
+        for (const item of (data.content || [])) {
+          const d = new Date(item.initDate);
+          cons.items.push({
+            id:             item.processInstanceId,
+            month:          d.toISOString().slice(0, 7),
+            initDate:       item.initDate,
+            endDate:        item.endDate || null,
+            resolverService:item.resolverITService || "(sin servicio)",
+            sourceService:  item.sourceITService  || "",
+            status:         item.status || "",
+            closureReason:  item.closureReason || null,
+            complexity:     item.complexity || null,
+            taskDueDate:    item.taskDueDate || null,
+          });
+        }
+        page++;
+        if (data.last) done = true;
+        const pct = totalPages ? Math.min(95, Math.round(page / Math.min(totalPages, page+10) * 100)) : 50;
+        dashSetLoading(true, `Consultas: pág. ${page}${totalPages?" / ~"+totalPages:""} · ${cons.items.length} topics`, pct);
+        await new Promise(r => setTimeout(r, 0));
+      }
+      stopKeepalive();
+      cons.loaded = true;
+      dashSetLoading(false);
+      if (!cons.cancel) renderConsultas();
+    } catch (e) {
+      stopKeepalive();
+      dashSetLoading(false);
+      dashShowErr("Error consultas: " + e.message);
+    }
+  }
+
+  function loadConsultasDemo() {
+    const cons = state.dash.cons;
+    cons.cancel  = true;
+    cons.items   = [];
+    cons.loaded       = true;
+    cons.serviceFilter = "all";
+    const services = ["Chapter QA","OpenServices","Control de Accesos","Arquitectura API Management","Arquitectura SPA","Arquitectura Canal ABSIS","SQUAD 3","SQUAD 4","SQUAD 5","Ciclo de Vida","Datapool","Transmisión de Ficheros","Autenticación","Arquitectura Batch","Cloud Products Squad"];
+    const reasons  = ["Resolved with feedback","Resolved with feedback","Resolved with feedback","Inactivity without feedback",null];
+    const cplx     = ["LOW","LOW","MEDIUM","MEDIUM","HIGH",null];
+    const statuses = ["IN_PROGRESS","IN_PROGRESS","COMPLETED","COMPLETED","RESOLVED"];
+    const now = new Date();
+    for (let m = 0; m < 12; m++) {
+      const d    = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const month = d.toISOString().slice(0, 7);
+      const vol   = 15 + Math.round(Math.random() * 25) + (m < 3 ? 10 : 0);
+      for (let i = 0; i < vol; i++) {
+        const rd  = new Date(d.getFullYear(), d.getMonth(), 1 + Math.floor(Math.random()*28));
+        const st  = statuses[Math.floor(Math.random()*statuses.length)];
+        const cr  = st !== "IN_PROGRESS" ? reasons[Math.floor(Math.random()*reasons.length)] : null;
+        const end = st !== "IN_PROGRESS" ? new Date(rd.getTime() + (1+Math.random()*6)*86400000) : null;
+        const due = new Date(rd.getTime() + (2+Math.floor(Math.random()*12))*86400000);
+        cons.items.push({
+          id: "DEMO-"+Math.random().toString(36).slice(2), month,
+          initDate: rd.toISOString(), endDate: end ? end.toISOString() : null,
+          resolverService: services[Math.floor(Math.random()*services.length)],
+          sourceService: "Demo Source",
+          status: st, closureReason: cr,
+          complexity: cr ? cplx[Math.floor(Math.random()*cplx.length)] : null,
+          taskDueDate: due.toISOString(),
+        });
+      }
+    }
+    // Solo renderizar si la pestaña Consultas está activa
+    const consmain = document.getElementById("ttdb-cons-main");
+    if (consmain && consmain.style.display !== "none") renderConsultas();
+    // Resetear el select de servicio para que se repopule
+    const sel = document.getElementById("ttdb-svc-select");
+    if (sel) while (sel.options.length > 1) sel.remove(1);
+  }
+
+  function renderConsultas() {
+    const cons = state.dash.cons;
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+    const inPeriod  = cons.items.filter(i => new Date(i.initDate) >= cutoff);
+    const filtered  = cons.serviceFilter === "all"
+      ? inPeriod
+      : inPeriod.filter(i => i.resolverService === cons.serviceFilter);
+
+    // Populate service dropdown
+    const sel = document.getElementById("ttdb-svc-select");
+    if (sel && sel.options.length === 1) {
+      const svcs = [...new Set(inPeriod.map(i => i.resolverService))].sort();
+      svcs.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; sel.appendChild(o); });
+    }
+    if (sel) sel.value = cons.serviceFilter;
+
+    const cntEl = document.getElementById("ttdb-cons-count");
+    if (cntEl) cntEl.textContent = `${filtered.length} consulta${filtered.length!==1?"s":""}${cons.serviceFilter!=="all" ? " · "+cons.serviceFilter : ""}`;
+
+    const months = dashBuildMonths(cons.windowM);
+    dashRenderConsultasKPIs(filtered);
+    dashRenderServiceBars(inPeriod);
+    dashRenderConsultasBar(filtered, months);
+    dashRenderFeedbackDonut(filtered);
+    dashRenderComplexity(filtered);
+
+    const main = document.getElementById("ttdb-cons-main");
+    if (main) main.style.display = "flex";
+  }
+
+  function fmtDays(ms) {
+    if (!ms || ms < 0) return "—";
+    const h = ms / 3600000;
+    if (h < 24) return "<1d";
+    return Math.round(h/24) + "d";
+  }
+
+  function dashRenderConsultasKPIs(items) {
+    const el = document.getElementById("ttdb-cons-kpis");
+    if (!el) return;
+    const now = new Date();
+    const total   = items.length;
+    const inprog  = items.filter(i => i.status === "IN_PROGRESS").length;
+    const closed  = items.filter(i => i.status !== "IN_PROGRESS");
+    const withFB  = closed.filter(i => i.closureReason === "Resolved with feedback").length;
+    const noFB    = closed.filter(i => i.closureReason === "Inactivity without feedback").length;
+    const fbRate  = closed.length ? Math.round(withFB / closed.length * 100) : null;
+    const resTimes= items.filter(i => i.endDate && i.initDate).map(i => new Date(i.endDate)-new Date(i.initDate));
+    const avgMs   = resTimes.length ? resTimes.reduce((a,b)=>a+b,0)/resTimes.length : null;
+    const limit48 = new Date(now.getTime() + 48*3600000);
+    const riesgo  = items.filter(i => i.status === "IN_PROGRESS" && i.taskDueDate && new Date(i.taskDueDate) <= limit48).length;
+    el.innerHTML = `
+      <div class="ttdb-kcard ttdb-kc-acc">
+        <div class="ttdb-kl">Total consultas${ttip("Total de consultas (topics) en el periodo de 12 meses. GET /devops/processApplication/bis/topics?status=COMPLETED,RESOLVED,IN_PROGRESS · Campo: initDate.")}</div>
+        <div class="ttdb-kv">${fmtN(total)}</div>
+        <div class="ttdb-ksub">${fmtN(closed.length)} cerradas · ${fmtN(inprog)} activas</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-pur">
+        <div class="ttdb-kl">En curso${ttip("Consultas con status = IN_PROGRESS. Aún abiertas, esperando respuesta o resolución. Campo status de /devops/processApplication/bis/topics.")}</div>
+        <div class="ttdb-kv">${fmtN(inprog)}</div>
+        <div class="ttdb-ksub">${pctN(inprog,total)}% del total</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-grn">
+        <div class="ttdb-kl">Con feedback${ttip("closureReason = \"Resolved with feedback\". El usuario confirmó resolución satisfactoria. Tasa sobre consultas cerradas (COMPLETED + RESOLVED).")}</div>
+        <div class="ttdb-kv">${fbRate !== null ? fbRate+"%" : "—"}</div>
+        <div class="ttdb-ksub">${fmtN(withFB)} de ${fmtN(closed.length)} cerradas</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-amb">
+        <div class="ttdb-kl">Sin feedback${ttip("closureReason = \"Inactivity without feedback\". Cerrado automáticamente por inactividad sin confirmación del usuario. Campo closureReason.")}</div>
+        <div class="ttdb-kv">${fmtN(noFB)}</div>
+        <div class="ttdb-ksub">${pctN(noFB,closed.length||1)}% de cerradas</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-acc" style="--c:#00CFB9">
+        <div class="ttdb-kl">T. medio resolución${ttip("Promedio de (endDate − initDate) de los topics cerrados. Solo disponible en COMPLETED y RESOLVED con endDate. Campo endDate de topics.")}</div>
+        <div class="ttdb-kv" style="color:#00CFB9;font-size:22px">${fmtDays(avgMs)}</div>
+        <div class="ttdb-ksub">${resTimes.length} con fecha de cierre</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-rose">
+        <div class="ttdb-kl">⚠ En riesgo${ttip("IN_PROGRESS con taskDueDate ≤ ahora + 48h. Consultas activas que vencen en menos de 48h o ya vencidas. Campo taskDueDate de topics.")}</div>
+        <div class="ttdb-kv">${fmtN(riesgo)}</div>
+        <div class="ttdb-ksub">vence en &lt;48h</div>
+      </div>
+    `;
+  }
+
+  function dashRenderServiceBars(items) {
+    const el = document.getElementById("ttdb-cons-services");
+    if (!el) return;
+    const counts = {};
+    items.forEach(i => { counts[i.resolverService] = (counts[i.resolverService]||0)+1; });
+    const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    const maxC = sorted[0]?.[1] || 1;
+    const total = items.length || 1;
+    const svcColors = ["#00C4E9","#7c3aed","#00CFB9","#f4c53d","#e83e8c","#30BBE2","#a78bfa","#34d399","#fb923c","#60a5fa","#f472b6","#4ade80","#facc15","#c084fc","#38bdf8"];
+    el.innerHTML = sorted.map(([name, count], idx) => {
+      const color = svcColors[idx % svcColors.length];
+      const w = Math.round(count / maxC * 100);
+      const sel = state.dash.cons.serviceFilter === name;
+      return `<div class="ttdb-type-row" style="${sel?"background:#f0faff;border-radius:6px;margin:0 -4px;padding:0 4px":""}" onclick="window.__teamerToolkit._dashSvcFilterClick('${name.replace(/'/g,"\\'")}');" style="cursor:pointer">
+        <div class="ttdb-type-name" style="min-width:180px;max-width:180px;cursor:pointer;color:${sel?"#00C4E9":"#2c3050"}" title="${name.replace(/"/g,"&quot;")}">${name.replace(/</g,"&lt;")}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1;width:auto">
+          <div class="ttdb-type-bar-fill" style="width:${w}%;background:${color}"></div>
+        </div>
+        <div class="ttdb-type-count" style="width:44px">${fmtN(count)}</div>
+        <div style="width:34px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pctN(count,total)}%</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:20px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
+  function dashRenderConsultasBar(items, months) {
+    const svg = document.getElementById("ttdb-cons-bar");
+    if (!svg) return;
+    const byM = {};
+    months.forEach(m => { byM[m] = 0; });
+    items.forEach(i => { if (byM[i.month]!==undefined) byM[i.month]++; });
+    const maxVal = Math.max(1, ...months.map(m => byM[m]));
+    const H=160, padT=8, padB=28, padL=30, padR=8, chartH=H-padT-padB;
+    const W = svg.parentElement ? (svg.parentElement.clientWidth||500) : 500;
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const n = months.length, step = (W-padL-padR)/n;
+    const barW = Math.max(6, step - 4);
+    const mNames = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    let out = "";
+    for (let t=0; t<=4; t++) {
+      const y = padT + chartH - (t/4)*chartH;
+      out += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#dde3e8" stroke-width="1"/>`;
+      out += `<text x="${padL-4}" y="${y+3}" text-anchor="end" font-size="8" fill="#8a9bb0">${Math.round(t/4*maxVal)}</text>`;
+    }
+    months.forEach((m, i) => {
+      const x = padL + i*step + (step-barW)/2;
+      const v = byM[m];
+      const bH = v/maxVal*chartH;
+      if (bH>0) out += `<rect x="${x}" y="${padT+chartH-bH}" width="${barW}" height="${bH}" fill="#00C4E9" rx="2"/>`;
+      const mNum = parseInt(m.slice(5));
+      out += `<text x="${x+barW/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="#8a9bb0">${mNames[mNum]}</text>`;
+      out += `<text x="${x+barW/2}" y="${H-4}" text-anchor="middle" font-size="7" fill="#c2cdd6">${m.slice(2,4)}</text>`;
+      if (v>0) out += `<text x="${x+barW/2}" y="${padT+chartH-bH-3}" text-anchor="middle" font-size="7" fill="#8a9bb0">${v}</text>`;
+    });
+    svg.innerHTML = out;
+  }
+
+  function dashRenderFeedbackDonut(items) {
+    const arcsEl = document.getElementById("ttdb-cons-donut-arcs");
+    const legEl  = document.getElementById("ttdb-cons-dlegend");
+    const totEl  = document.getElementById("ttdb-cons-donut-total");
+    if (!arcsEl) return;
+    const withFB = items.filter(i => i.closureReason === "Resolved with feedback").length;
+    const noFB   = items.filter(i => i.closureReason === "Inactivity without feedback").length;
+    const pending= items.filter(i => i.status === "IN_PROGRESS").length;
+    const counts = { withFB, noFB, pending };
+    const colors = { withFB:"#00CFB9", noFB:"#f4c53d", pending:"#00C4E9" };
+    const labels = { withFB:"Con feedback", noFB:"Sin feedback", pending:"Pendiente" };
+    const total  = items.length || 1;
+    const r=36, cx=50, cy=50, circ=2*Math.PI*r;
+    let offset=0, arcs="";
+    for (const [k,v] of Object.entries(counts)) {
+      const dash = v/total*circ;
+      arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[k]}" stroke-width="16" stroke-dasharray="${dash} ${circ-dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      offset += dash;
+    }
+    arcsEl.innerHTML = arcs;
+    if (totEl) totEl.textContent = fmtN(items.length);
+    if (legEl) legEl.innerHTML = Object.entries(counts).map(([k,v]) =>
+      `<div class="ttdb-dl"><div class="ttdb-dl-dot" style="background:${colors[k]}"></div><span>${labels[k]}</span><span class="ttdb-dl-val">${fmtN(v)}<span style="font-weight:400;color:#8a9bb0;font-size:9px"> (${pctN(v,items.length)}%)</span></span></div>`
+    ).join("");
+  }
+
+  function dashRenderComplexity(items) {
+    const el = document.getElementById("ttdb-cons-cplx");
+    if (!el) return;
+    const defs = [
+      { key:"LOW",    label:"Baja",   color:"#00CFB9" },
+      { key:"MEDIUM", label:"Media",  color:"#f4c53d" },
+      { key:"HIGH",   label:"Alta",   color:"#e83e8c" },
+    ];
+    const counts = {};
+    items.forEach(i => { if (i.complexity) counts[i.complexity] = (counts[i.complexity]||0)+1; });
+    const hasData = defs.some(d => counts[d.key]);
+    if (!hasData) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos de complejidad (solo disponible en consultas cerradas)</div>`;
+      return;
+    }
+    el.innerHTML = defs.map(({key,label,color}) => {
+      const v = counts[key]||0;
+      const t = items.filter(i=>i.complexity).length||1;
+      return `<div class="ttdb-cplx-item">
+        <div class="ttdb-cplx-val" style="color:${color}">${fmtN(v)}</div>
+        <div class="ttdb-cplx-lbl">${label}</div>
+        <div style="font-size:9px;color:#8a9bb0;margin-top:2px">${pctN(v,t)}%</div>
+      </div>`;
+    }).join("");
+  }
+
   // ── Public dashboard controls ──────────────────────────────────────
   window.__teamerToolkit._dashClose      = closeDashboard;
-  window.__teamerToolkit._dashDemo       = loadDashDemo;
-  window.__teamerToolkit._dashCancel     = () => { state.dash.cancel = true; };
+  window.__teamerToolkit._dashDemo       = () => {
+    loadDashDemo();
+    // also demo for consultas if on that tab
+    loadConsultasDemo();
+  };
+  window.__teamerToolkit._dashCancel     = () => { state.dash.cancel = true; state.dash.cons.cancel = true; };
+
+  window.__teamerToolkit._dashNav = (tab, el) => {
+    document.querySelectorAll(".ttdb-ntab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    const main  = document.getElementById("ttdb-main");
+    const cmain = document.getElementById("ttdb-cons-main");
+    if (tab === "vol") {
+      if (main)  main.style.display  = "";
+      if (cmain) cmain.style.display = "none";
+    } else {
+      if (main)  main.style.display  = "none";
+      if (cmain) {
+        cmain.style.display = "flex";
+        if (!state.dash.cons.loaded) {
+          cmain.style.display = "none";
+          loadConsultasData();
+        } else {
+          renderConsultas();
+          // redraw SVG after display:flex
+          setTimeout(() => dashRenderConsultasBar(
+            state.dash.cons.items.filter(i => {
+              const c = new Date(); c.setFullYear(c.getFullYear()-1);
+              const svc = state.dash.cons.serviceFilter;
+              return new Date(i.initDate) >= c && (svc==="all" || i.resolverService===svc);
+            }),
+            dashBuildMonths(state.dash.cons.windowM)
+          ), 50);
+        }
+      }
+    }
+  };
+
+  window.__teamerToolkit._dashSvcFilter = (svc) => {
+    state.dash.cons.serviceFilter = svc;
+    renderConsultas();
+    setTimeout(() => {
+      const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+      const f = state.dash.cons.items.filter(i => {
+        return new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc);
+      });
+      dashRenderConsultasBar(f, dashBuildMonths(state.dash.cons.windowM));
+    }, 50);
+  };
+
+  window.__teamerToolkit._dashSvcFilterClick = (svc) => {
+    const cur = state.dash.cons.serviceFilter;
+    const next = cur === svc ? "all" : svc;
+    const sel = document.getElementById("ttdb-svc-select");
+    if (sel) sel.value = next;
+    window.__teamerToolkit._dashSvcFilter(next);
+  };
+
+  window.__teamerToolkit._dashConsWindow = (n, el) => {
+    el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    state.dash.cons.windowM = n;
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+    const svc = state.dash.cons.serviceFilter;
+    const f = state.dash.cons.items.filter(i =>
+      new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc)
+    );
+    dashRenderConsultasBar(f, dashBuildMonths(n));
+  };
   window.__teamerToolkit._dashWindow     = (n, el) => {
     el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t=>t.classList.remove("active"));
     el.classList.add("active");
@@ -873,7 +1304,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v4</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 16:33</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
@@ -983,6 +1414,6 @@
   installNetworkHooks();
   installObserver();
   createPanel();
-  setOutput("✅ Listo (v4).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' para abrir el dashboard de volumetría.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.");
+  setOutput("✅ Listo (v5).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' → pestaña Volumetría o 💬 Consultas.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.");
 
 })();
