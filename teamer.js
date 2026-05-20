@@ -24,6 +24,43 @@
     dashPageSize: 3000,  // la API devolverá lo que acepte; se ajusta automáticamente
   };
 
+  // All known endpoints captured from session analysis (tt-analysis-2026-05-20T14-48-37.json)
+  // Used to pre-populate the API Explorer even before the current session intercepts them.
+  const KNOWN_ENDPOINTS = [
+    {method:"POST",pattern:"https://apicollector.pro.internal.caixabank.com/tech/rla/logs",count:215,statusCodes:{"200":215},queryParamKeys:[],responseFields:["numIndexedLogs"]},
+    {method:"POST",pattern:"https://api.pro.internal.caixabank.com/devops/others/bis/idewan/matomo.php",count:40,statusCodes:{"200":39,"401":1},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/requests/{id}",count:16,statusCodes:{"200":16},queryParamKeys:[],responseFields:["request-id","date","type-id","requester","requester_name","room-id"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/types/{id}",count:16,statusCodes:{"200":16},queryParamKeys:[],responseFields:["type-id","description","category-id","categoryDescription","processKey","approvalDueDate","resolutionDueDate","approvalsRequired","isVisible","isBlocked","room-id"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/int/topics/services",count:14,statusCodes:{"200":14},queryParamKeys:["page","isAdmin","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topics",count:14,statusCodes:{"200":14},queryParamKeys:["closureReason","page","size","status"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/",count:11,statusCodes:{"404":11},queryParamKeys:["userId"],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/requests/{id}/logs",count:11,statusCodes:{"200":11},queryParamKeys:["tag","page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/tech/bpmcontroller/3/process/{ref}/taskList",count:7,statusCodes:{"200":7},queryParamKeys:["includeBreadcrumb"],responseFields:["breadCrumb","processStatus","processContext"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/my-processes/{ref}/candidates",count:7,statusCodes:{"200":7},queryParamKeys:[],responseFields:["candidates"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/types",count:5,statusCodes:{"200":5},queryParamKeys:["isAdvanced","page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/crossChannel/crossChannelManagement/alias/ruleTargets/DashboardTeamer/tags",count:4,statusCodes:{"401":1,"404":3},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/categories",count:4,statusCodes:{"200":3,"401":1},queryParamKeys:["page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"POST",pattern:"https://api.pro.internal.caixabank.com/tech/idecua/api/v1/stats/queryElk",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:["took","timed_out","_shards","hits","aggregations"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/rooms/{id}/attachments",count:2,statusCodes:{"200":2},queryParamKeys:["page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/tech/idegar/1/applications",count:2,statusCodes:{"200":2},queryParamKeys:["page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topic/{ref}/feedback",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:["completedBy","resolutionRating","iaRating"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/my-tasks",count:2,statusCodes:{"200":2},queryParamKeys:["isAdvanced","page","size","description"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/my-processes",count:2,statusCodes:{"200":2},queryParamKeys:["isAdvanced","page","size","description"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/dashboardTeamer/bis/notifications/own/employees/id",count:2,statusCodes:{"200":1,"401":1},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topic/{ref}",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:["processInstanceId","idRequest","ppm","title","description","fieldValues","idAppGar","appGar","idResolverITService","resolverITService","idSourceITService","sourceITService"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topic/itService/{id}/origins",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topic/itService/{id}",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:["id","name","roomId"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/tech/idegar/1/itServices/{id}",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:["id","name","description","groupId","groupName","backlogId","code","responsibles","applications"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/int/processInstances/{ref}/topics/resolvers",count:2,statusCodes:{"200":2},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/tech/idecua/api/v1/user",count:1,statusCodes:{"200":1},queryParamKeys:[],responseFields:["matricula","mail","nombre","apellidos","token","company","centre","type","empresaActiva","avatarUrl","roles","reglas"]},
+    {method:"POST",pattern:"https://api.pro.internal.caixabank.com/tech/bpmcontroller/3/tasks/{ref}/claim",count:1,statusCodes:{"403":1},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/processApplication/bis/topic/itService/{id}/template",count:1,statusCodes:{"404":1},queryParamKeys:[],responseFields:[]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/bis/1/rooms/{id}/comments",count:1,statusCodes:{"200":1},queryParamKeys:["page","size"],responseFields:["totalPages","totalElements","size","number","numberOfElements","last","first","empty","content"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/dashboardTeamer/bis/userConfiguration/employees/id",count:1,statusCodes:{"200":1},queryParamKeys:[],responseFields:[]},
+    {method:"POST",pattern:"https://api.pro.internal.caixabank.com/token",count:1,statusCodes:{"200":1},queryParamKeys:[],responseFields:["access_token","token_type","expires_in"]},
+    {method:"GET",pattern:"https://api.pro.internal.caixabank.com/devops/dashboardTeamer/bis/notifications/count/employees/id",count:1,statusCodes:{"200":1},queryParamKeys:[],responseFields:[]},
+  ];
+
   const state = {
     observer: null,
     network: [],
@@ -411,7 +448,14 @@
         <span class="ttdb-pill" id="ttdb-mode">LIVE</span>
         <span id="ttdb-period" style="font-size:9px;padding:3px 9px;border-radius:20px;background:#f5f7f9;color:#8a9bb0;border:1px solid #dde3e8"></span>
         <div class="ttdb-live" style="margin-left:auto"><div class="ttdb-dot"></div><span>api.pro.internal.caixabank.com</span></div>
-        <div style="display:flex;gap:6px">
+        <div id="ttdb-hdr-svc" style="display:none;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-size:10px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:1px;white-space:nowrap">Servicio</span>
+          <select class="ttdb-svc-select" id="ttdb-svc-select" onchange="window.__teamerToolkit._dashSvcFilter(this.value)">
+            <option value="all">Todos los servicios</option>
+          </select>
+          <span id="ttdb-cons-count" style="font-size:10px;color:#8a9bb0;white-space:nowrap"></span>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
           <button class="ttdb-btn ttdb-btn-primary" id="ttdb-btn-demo" onclick="window.__teamerToolkit._dashDemo()">Demo</button>
           <button class="ttdb-btn ttdb-btn-close" onclick="window.__teamerToolkit._dashClose()">✕ Cerrar</button>
         </div>
@@ -485,14 +529,6 @@
       </div>
 
       <div class="ttdb-cons-main" id="ttdb-cons-main" style="display:none">
-        <div class="ttdb-svc-filter">
-          <span style="font-size:10px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:1px;white-space:nowrap">Servicio</span>
-          <select class="ttdb-svc-select" id="ttdb-svc-select" onchange="window.__teamerToolkit._dashSvcFilter(this.value)">
-            <option value="all">Todos los servicios</option>
-          </select>
-          <span id="ttdb-cons-count" style="font-size:10px;color:#8a9bb0"></span>
-        </div>
-
         <div class="ttdb-kpis" id="ttdb-cons-kpis"></div>
 
         <div class="ttdb-card">
@@ -1573,27 +1609,76 @@
     const cntEl = document.getElementById("ttdb-net-count");
     if (!el) return;
     const filter = state.dash.netFilter || "all";
-    let patterns = Object.values(state.byPattern);
+
+    // Merge live captures with KNOWN_ENDPOINTS catalog
+    // Live data takes precedence; known-only endpoints get a "📚 histórico" badge
+    const liveMap = {};
+    for (const p of Object.values(state.byPattern)) {
+      liveMap[p.method + "|" + p.pattern] = p;
+    }
+    const knownMap = {};
+    for (const k of KNOWN_ENDPOINTS) {
+      knownMap[k.method + "|" + k.pattern] = k;
+    }
+    // Build combined list
+    const allKeys = new Set([...Object.keys(liveMap), ...Object.keys(knownMap)]);
+    let patterns = [];
+    for (const key of allKeys) {
+      const live = liveMap[key];
+      const known = knownMap[key];
+      if (live) {
+        // Enrich live entry with known responseFields if live has no body yet
+        patterns.push({ ...live, _knownFields: known?.responseFields || [], _historic: false });
+      } else {
+        // known-only: use historical data, mark as historic
+        patterns.push({
+          pattern: known.pattern,
+          method: known.method,
+          count: known.count,
+          errors: Object.entries(known.statusCodes).filter(([s])=>s[0]!=="2").reduce((a,[,c])=>a+c,0),
+          totalMs: 0,
+          statusCodes: known.statusCodes,
+          queryParamKeys: known.queryParamKeys,
+          examples: [],
+          _knownFields: known.responseFields || [],
+          _historic: true,
+        });
+      }
+    }
+
+    // Apply filters
     if (filter === "api")    patterns = patterns.filter(p => p.pattern.includes("api.pro.internal") || p.pattern.includes("api.pro.caixabank"));
     if (filter === "errors") patterns = patterns.filter(p => p.errors > 0);
-    patterns.sort((a,b) => b.count - a.count);
-    if (cntEl) cntEl.textContent = `${patterns.length} endpoint${patterns.length!==1?"s":""} · ${state.network.length} llamadas`;
+    patterns.sort((a,b) => {
+      // live entries first, then sort by count desc
+      if (!a._historic && b._historic) return -1;
+      if (a._historic && !b._historic) return 1;
+      return b.count - a.count;
+    });
+
+    const liveCount = patterns.filter(p=>!p._historic).length;
+    const histCount = patterns.filter(p=>p._historic).length;
+    if (cntEl) cntEl.textContent = `${patterns.length} endpoints · ${liveCount} live · ${histCount} histórico · ${state.network.length} llamadas`;
+
     if (!patterns.length) {
-      el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a9bb0;font-size:12px">Sin llamadas capturadas. Navega por el portal para capturarlas.</div>`;
+      el.innerHTML = `<div style="text-align:center;padding:40px;color:#8a9bb0;font-size:12px">Sin endpoints. Navega por el portal para capturarlos.</div>`;
       return;
     }
+
     const mColor = m => m==="GET"?"ttdb-net-m-get":m==="POST"?"ttdb-net-m-post":"ttdb-sc-e";
     el.innerHTML = patterns.map((p, idx) => {
-      const avgMs = p.count ? Math.round(p.totalMs/p.count) : 0;
+      const avgMs = (!p._historic && p.count) ? Math.round(p.totalMs/p.count) : 0;
       const errPct = p.count ? Math.round(p.errors/p.count*100) : 0;
       const scBadges = Object.entries(p.statusCodes).map(([s,c]) => {
         const cls = s[0]==="2"?"ttdb-sc-2":s[0]==="4"?"ttdb-sc-4":s[0]==="5"?"ttdb-sc-5":"ttdb-sc-e";
         return `<span class="ttdb-sc-pill ${cls}">${s} ×${c}</span>`;
       }).join("");
+
       // best example: last one with resBody
-      const ex = [...p.examples].reverse().find(e=>e.resBody) || p.examples[p.examples.length-1];
+      const ex = p.examples?.length ? ([...p.examples].reverse().find(e=>e.resBody) || p.examples[p.examples.length-1]) : null;
       const body = ex?.resBody;
-      // response field pills
+
+      // response field pills — prefer live body keys, fall back to known fields catalog
       let fieldHtml = "";
       if (body && typeof body === "object") {
         const keys = body.content ? Object.keys(body.content[0]||{}) : Object.keys(body);
@@ -1603,19 +1688,25 @@
           return `<span class="ttdb-fld">${k}: <b>${preview}</b></span>`;
         }).join("");
         if (body.content) fieldHtml = `<span class="ttdb-fld">total: <b>${body.totalElements}</b></span> <span class="ttdb-fld">pages: <b>${body.totalPages}</b></span> ` + fieldHtml;
+      } else if (p._knownFields?.length) {
+        fieldHtml = p._knownFields.map(k => `<span class="ttdb-fld">${k}</span>`).join("");
       }
+
       const qpKeys = p.queryParamKeys instanceof Set ? [...p.queryParamKeys] : (p.queryParamKeys||[]);
-      const sample = body ? JSON.stringify(body,null,2).slice(0,1200)+(JSON.stringify(body).length>1200?"\n…":"") : (ex?.resBody||"(sin body)");
+      const sample = body ? JSON.stringify(body,null,2).slice(0,1200)+(JSON.stringify(body).length>1200?"\n…":"") : (p._historic ? "(sin captura en sesión actual)" : "(sin body)");
       const urlShort = p.pattern
         .replace("https://api.pro.internal.caixabank.com","[API]")
         .replace("https://apicollector.pro.internal.caixabank.com","[COLLECTOR]")
         .replace(/https?:\/\/[^/]+/,"[PORTAL]");
+      const badge = p._historic
+        ? `<span style="font-size:9px;padding:1px 5px;border-radius:8px;background:#f0f4ff;color:#7c3aed;border:1px solid #c4b5fd;flex-shrink:0">📚 histórico</span>`
+        : `<span class="ttdb-net-cnt">${p.count} call${p.count!==1?"s":""}</span>`;
       return `<div class="ttdb-net-row" id="ttdb-nr-${idx}">
         <div class="ttdb-net-head" onclick="window.__teamerToolkit._dashNetExpand(${idx})">
           <span class="ttdb-net-method ${mColor(p.method)}">${p.method}</span>
           <span class="ttdb-net-url" title="${p.pattern}">${urlShort}</span>
-          <span class="ttdb-net-cnt">${p.count} call${p.count!==1?"s":""}</span>
-          <span class="ttdb-net-ms">${avgMs}ms</span>
+          ${badge}
+          ${!p._historic && avgMs ? `<span class="ttdb-net-ms">${avgMs}ms</span>` : ""}
           ${p.errors?`<span class="ttdb-net-err">⚠ ${errPct}% err</span>`:""}
           <span class="ttdb-net-chev">▶</span>
         </div>
@@ -1623,7 +1714,7 @@
           <div class="ttdb-net-sc">${scBadges}</div>
           ${qpKeys.length?`<div><span class="ttdb-net-section">Query params</span><div class="ttdb-net-fields">${qpKeys.map(k=>`<span class="ttdb-fld">${k}</span>`).join("")}</div></div>`:""}
           ${fieldHtml?`<div><span class="ttdb-net-section">Campos response</span><div class="ttdb-net-fields">${fieldHtml}</div></div>`:""}
-          <div><span class="ttdb-net-section">Último response</span><pre class="ttdb-net-pre">${String(sample).replace(/</g,"&lt;")}</pre></div>
+          <div><span class="ttdb-net-section">${p._historic?"Response (histórico)":"Último response"}</span><pre class="ttdb-net-pre">${String(sample).replace(/</g,"&lt;")}</pre></div>
         </div>
       </div>`;
     }).join("");
@@ -1641,10 +1732,12 @@
   window.__teamerToolkit._dashNav = (tab, el) => {
     document.querySelectorAll(".ttdb-ntab").forEach(t => t.classList.remove("active"));
     el.classList.add("active");
-    const main  = document.getElementById("ttdb-main");
-    const cmain = document.getElementById("ttdb-cons-main");
-    const nmain = document.getElementById("ttdb-net-main");
+    const main   = document.getElementById("ttdb-main");
+    const cmain  = document.getElementById("ttdb-cons-main");
+    const nmain  = document.getElementById("ttdb-net-main");
+    const svcHdr = document.getElementById("ttdb-hdr-svc");
     [main,cmain,nmain].forEach(e => { if(e) e.style.display="none"; });
+    if (svcHdr) svcHdr.style.display = tab === "cons" ? "flex" : "none";
     if (tab === "vol") {
       if (main) main.style.display = "";
     } else if (tab === "cons") {
@@ -1752,7 +1845,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 19:36</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 19:57</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
