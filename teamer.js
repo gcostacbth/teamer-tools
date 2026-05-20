@@ -181,12 +181,22 @@
 
   // ==== Token helper ====
   function getAuth() {
-    // 1. Más reciente del log de red (siempre refleja el último token en uso)
+    // 1. Prioridad máxima: body del endpoint /token (OIDC rotation)
+    //    Angular PKCE intercambia el auth code vía POST /token y devuelve
+    //    access_token en el body — es la fuente más fresca disponible.
+    for (const c of state.network) {
+      if (c.url && /\/token(\?.*)?$/.test(c.url) && c.status === 200 && c.resBody) {
+        const body = (c.resBody && typeof c.resBody === "object")
+          ? c.resBody : tryParseJson(c.resBody);
+        if (body && body.access_token) return "Bearer " + body.access_token;
+      }
+    }
+    // 2. Cabecera Authorization de peticiones recientes (Bearer únicamente)
     for (const c of state.network) {
       const auth = c.reqHeaders?.Authorization || c.reqHeaders?.authorization;
-      if (auth) return auth;
+      if (auth && auth.startsWith("Bearer ")) return auth;
     }
-    // 2. Escanear sessionStorage y localStorage (el portal puede guardarlo ahí)
+    // 3. sessionStorage / localStorage
     for (const store of [sessionStorage, localStorage]) {
       try {
         for (let i = 0; i < store.length; i++) {
@@ -531,23 +541,25 @@
     stopKeepalive();
     _keepaliveTimer = setInterval(async () => {
       try {
-        const auth = getAuth();
-        const headers = { Accept: "application/json" };
-        if (auth) headers["Authorization"] = auth;
-        // Usar window.fetch (parcheado) — pasa por el stack de interceptores del portal
+        // Sin cabecera Authorization explícita: dejamos que el servidor use cookies.
+        // Añadir un token expirado aquí contaminaba state.network y bloqueaba
+        // waitForFreshToken, que busca el token más reciente en el log de red.
         await window.fetch(`${CONFIG.dashboardApi}${KEEPALIVE_ENDPOINT}`, {
-          credentials: "include", headers,
+          credentials: "include",
+          headers: { Accept: "application/json" },
         });
         log("[keepalive] ping OK");
       } catch (e) { log("[keepalive] ping error:", e.message); }
-    }, 55_000); // cada 55 s — antes del timeout típico de 60 s
+    }, 55_000);
   }
 
   function stopKeepalive() {
     if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
   }
 
-  // Espera hasta que aparezca un token DIFERENTE al actual (red o storage).
+  // Espera hasta que aparezca un token DIFERENTE al actual.
+  // El intercambio PKCE (/token) suele completarse en < 400ms,
+  // así que polling a 200ms lo captura en el primer o segundo ciclo.
   function waitForFreshToken(oldAuth, timeoutMs = 25000) {
     return new Promise(resolve => {
       const start = Date.now();
@@ -555,7 +567,7 @@
         const fresh = getAuth();
         if (fresh && fresh !== oldAuth) { clearInterval(iv); resolve(fresh); return; }
         if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
-      }, 500);
+      }, 200);
     });
   }
 
@@ -1102,7 +1114,7 @@
       const color = svcColors[idx % svcColors.length];
       const w = Math.round(count / maxC * 100);
       const sel = state.dash.cons.serviceFilter === name;
-      return `<div class="ttdb-type-row" style="${sel?"background:#f0faff;border-radius:6px;margin:0 -4px;padding:0 4px":""}" onclick="window.__teamerToolkit._dashSvcFilterClick('${name.replace(/'/g,"\\'")}');" style="cursor:pointer">
+      return `<div class="ttdb-type-row" style="cursor:pointer;${sel?"background:#f0faff;border-radius:6px;margin:0 -4px;padding:0 4px":""}" onclick="window.__teamerToolkit._dashSvcFilterClick('${name.replace(/'/g,"\\'")}');">
         <div class="ttdb-type-name" style="min-width:180px;max-width:180px;cursor:pointer;color:${sel?"#00C4E9":"#2c3050"}" title="${name.replace(/"/g,"&quot;")}">${name.replace(/</g,"&lt;")}</div>
         <div class="ttdb-type-bar-wrap" style="flex:1;width:auto">
           <div class="ttdb-type-bar-fill" style="width:${w}%;background:${color}"></div>
@@ -1305,7 +1317,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 16:43</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 17:06</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
