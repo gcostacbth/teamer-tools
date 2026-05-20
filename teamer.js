@@ -353,11 +353,8 @@
   .ttdb-cplx-val{font-size:22px;font-weight:800;line-height:1}
   .ttdb-cplx-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.3px;color:#8a9bb0;margin-top:4px}
 
-  .ttdb-itip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#edf0f3;border:1px solid #c2cdd6;color:#8a9bb0;font-size:8px;font-weight:700;cursor:help;position:relative;flex-shrink:0;vertical-align:middle;margin-left:5px;line-height:1;user-select:none}
+  .ttdb-itip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#edf0f3;border:1px solid #c2cdd6;color:#8a9bb0;font-size:8px;font-weight:700;cursor:help;flex-shrink:0;vertical-align:middle;margin-left:5px;line-height:1;user-select:none}
   .ttdb-itip:hover{background:#00C4E9;color:#fff;border-color:#00C4E9}
-  .ttdb-tip{display:none;position:absolute;top:calc(100% + 5px);left:0;width:240px;background:#000026;color:#fff;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.55;padding:8px 11px;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.35);z-index:9999999;pointer-events:none;white-space:normal;text-align:left}
-  .ttdb-tip::before{content:'';position:absolute;bottom:100%;left:10px;border:5px solid transparent;border-bottom-color:#000026}
-  .ttdb-itip:hover .ttdb-tip{display:block}
   `;
 
   function injectDashboardStyle() {
@@ -409,7 +406,7 @@
 
         <div class="ttdb-card">
           <div class="ttdb-card-title">
-            <span>Volumen mensual</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Agrupación por mes de processInitDate. Azul: Consultas · Morado: Peticiones. El % encima de cada barra es el cambio vs el mes anterior (MoM delta).</span></span>
+            <span>Volumen mensual</span><span class="ttdb-itip" data-tip="Agrupación por mes de processInitDate. Azul: Consultas · Morado: Peticiones. El % encima de cada barra es el cambio vs el mes anterior (MoM delta).">i</span>
             <div class="ttdb-tabs">
               <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashWindow(12,this)">12m</div>
               <div class="ttdb-tab" onclick="window.__teamerToolkit._dashWindow(6,this)">6m</div>
@@ -424,13 +421,13 @@
         </div>
 
         <div class="ttdb-card">
-          <div class="ttdb-card-title"><span>Por categoría</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Campo categoryDescription de cada proceso. 6 categorías del portal (101-Consultas, 61-Ticketing, 81-Operación, 3-Aprovisionamiento, 21-Ciclo de vida, 141-Plataforma Cognitiva). Fuente: GET /devops/bis/1/categories.</span></span></div>
+          <div class="ttdb-card-title"><span>Por categoría</span><span class="ttdb-itip" data-tip="Campo categoryDescription de cada proceso. 6 categorías del portal (101-Consultas, 61-Ticketing, 81-Operación, 3-Aprovisionamiento, 21-Ciclo de vida, 141-Plataforma Cognitiva). Fuente: GET /devops/bis/1/categories.">i</span></div>
           <div id="ttdb-cats"></div>
         </div>
 
         <div class="ttdb-row2">
           <div class="ttdb-card">
-            <div class="ttdb-card-title"><span>Estado</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Distribución de processStatus: InProgress (activos), Cancelled (cerrados sin resolver), Expired (SLA vencido). Campo processStatus de GET /devops/bis/1/my-processes.</span></span></div>
+            <div class="ttdb-card-title"><span>Estado</span><span class="ttdb-itip" data-tip="Distribución de processStatus: InProgress (activos), Cancelled (cerrados sin resolver), Expired (SLA vencido). Campo processStatus de GET /devops/bis/1/my-processes.">i</span></div>
             <div class="ttdb-donut-wrap">
               <svg id="ttdb-donut" width="100" height="100" viewBox="0 0 100 100" style="flex-shrink:0">
                 <circle cx="50" cy="50" r="36" fill="none" stroke="#edf0f3" stroke-width="16"/>
@@ -443,7 +440,7 @@
           </div>
           <div class="ttdb-card">
             <div class="ttdb-card-title">
-              <span>Top tipos</span><span class="ttdb-itip" title="">i<span class="ttdb-tip">Campo requestTypeDescription de cada proceso (sin prefijo [ID]). Top 10 tipos más frecuentes del periodo. Filtrable por Consultas / Peticiones. Fuente: GET /devops/bis/1/my-processes.</span></span>
+              <span>Top tipos</span><span class="ttdb-itip" data-tip="Campo requestTypeDescription de cada proceso (sin prefijo [ID]). Top 10 tipos más frecuentes del periodo. Filtrable por Consultas / Peticiones. Fuente: GET /devops/bis/1/my-processes.">i</span>
               <div class="ttdb-tabs">
                 <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashTypeFilter('all',this)">Todos</div>
                 <div class="ttdb-tab" onclick="window.__teamerToolkit._dashTypeFilter('consulta',this)">Consultas</div>
@@ -503,14 +500,76 @@
 
         <div class="ttdb-card">
           <div class="ttdb-card-title">
-            <span>Complejidad</span>${ttip("Campo complexity de los topics cerrados (COMPLETED + RESOLVED). LOW / MEDIUM / HIGH. Solo disponible tras resolución. Aplica el filtro de servicio.")}
+            <span>Feedback mensual</span>${ttip("% de consultas cerradas (COMPLETED+RESOLVED) con closureReason=Resolved with feedback, agrupado por mes de initDate. La línea punteada marca el 50% como objetivo.")}
           </div>
-          <div class="ttdb-cplx" id="ttdb-cons-cplx"></div>
+          <div class="ttdb-chart-scroll"><svg id="ttdb-cons-fb-trend" style="display:block;width:100%;min-width:400px" height="130"></svg></div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Top solicitantes</span>${ttip("Campo sourceITService: equipo que abre la consulta. Muestra los 10 servicios que más consultas generan. Aplica el filtro de servicio resolver.")}
+            </div>
+            <div id="ttdb-cons-requesters"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Tipo de cierre</span>${ttip("Campo closureType.name de los topics cerrados: Resuelto / Leer manual / Asignación equivocada / Duplicado / etc. Indicador de calidad del routing.")}
+            </div>
+            <div id="ttdb-cons-closure"></div>
+          </div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>PPM</span>${ttip("Campo ppm de cada consulta: criticidad del proyecto asociado (No crítico / COSMOS / Normativo / TOP50 / Tier 1). Fuente: topics list endpoint.")}
+            </div>
+            <div id="ttdb-cons-ppm"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Complejidad</span>${ttip("Campo complexity de los topics cerrados (COMPLETED + RESOLVED). LOW / MEDIUM / HIGH. Solo disponible tras resolución. Aplica el filtro de servicio.")}
+            </div>
+            <div class="ttdb-cplx" id="ttdb-cons-cplx"></div>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(ov);
+
+    // ── Global tooltip box (position:fixed escapes all overflow:hidden parents) ──
+    const _tb = document.createElement("div");
+    _tb.id = "ttdb-tip-box";
+    _tb.style.cssText = "display:none;position:fixed;z-index:2147483647;background:#000026;color:#fff;font-size:10px;font-weight:400;line-height:1.6;padding:8px 12px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:260px;white-space:normal;pointer-events:none;letter-spacing:0;text-transform:none;font-family:'Segoe UI',system-ui,sans-serif";
+    document.body.appendChild(_tb);
+
+    function _posTip(anchor) {
+      const r = anchor.getBoundingClientRect();
+      let left = r.left;
+      if (left + 264 > window.innerWidth - 8) left = window.innerWidth - 268;
+      if (left < 8) left = 8;
+      _tb.style.left = left + "px";
+      _tb.style.top  = (r.bottom + 6) + "px";
+      requestAnimationFrame(() => {
+        if (r.bottom + 6 + _tb.offsetHeight > window.innerHeight - 4)
+          _tb.style.top = Math.max(4, r.top - _tb.offsetHeight - 6) + "px";
+      });
+    }
+    ov.addEventListener("mouseover", e => {
+      const it = e.target.closest(".ttdb-itip[data-tip]");
+      if (!it) return;
+      _tb.innerHTML = it.dataset.tip;
+      _tb.style.display = "block";
+      _posTip(it);
+    });
+    ov.addEventListener("mouseout", e => {
+      if (!e.target.closest(".ttdb-itip[data-tip]")) return;
+      if (e.relatedTarget && e.relatedTarget.closest(".ttdb-itip[data-tip]")) return;
+      _tb.style.display = "none";
+    });
+
     state.dash.overlay    = ov;
     state.dash.windowM    = 12;
     state.dash.typeFilter = "all";
@@ -522,9 +581,12 @@
 
   function closeDashboard() {
     state.dash.cancel = true;
+    state.dash.cons.cancel = true;
     stopKeepalive();
     const ov = document.getElementById("tt-dashboard");
     if (ov) ov.remove();
+    const tb = document.getElementById("ttdb-tip-box");
+    if (tb) tb.remove();
     state.dash.overlay = null;
   }
 
@@ -759,7 +821,10 @@
   function pctN(a,b){ return b ? Math.round(a/b*100) : 0; }
 
   function ttip(text) {
-    return `<span class="ttdb-itip">i<span class="ttdb-tip">${text}</span></span>`;
+    // Encodes content into data-tip; the global tip box (position:fixed) renders it,
+    // escaping overflow:hidden on parent cards and forcing correct text colour.
+    const enc = text.replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+    return `<span class="ttdb-itip" data-tip="${enc}">i</span>`;
   }
 
   function dashRenderKPIs(items) {
@@ -940,7 +1005,7 @@
     try {
       while (!done && !cons.cancel) {
         const data = await dashApiFetch("/devops/processApplication/bis/topics", {
-          page, size: 200, status: "COMPLETED,RESOLVED,IN_PROGRESS"
+          page, size: 3000, status: "COMPLETED,RESOLVED,IN_PROGRESS"
         });
         if (totalPages === null) totalPages = data.totalPages;
         for (const item of (data.content || [])) {
@@ -957,6 +1022,9 @@
             closureReason:  item.closureReason || null,
             complexity:     item.complexity || null,
             taskDueDate:    item.taskDueDate || null,
+            ppm:            item.ppm || null,
+            closureType:    item.closureType?.name || null,
+            topicOrigin:    item.topicOrigin?.name || null,
           });
         }
         page++;
@@ -982,10 +1050,14 @@
     cons.items   = [];
     cons.loaded       = true;
     cons.serviceFilter = "all";
-    const services = ["Chapter QA","OpenServices","Control de Accesos","Arquitectura API Management","Arquitectura SPA","Arquitectura Canal ABSIS","SQUAD 3","SQUAD 4","SQUAD 5","Ciclo de Vida","Datapool","Transmisión de Ficheros","Autenticación","Arquitectura Batch","Cloud Products Squad"];
-    const reasons  = ["Resolved with feedback","Resolved with feedback","Resolved with feedback","Inactivity without feedback",null];
-    const cplx     = ["LOW","LOW","MEDIUM","MEDIUM","HIGH",null];
-    const statuses = ["IN_PROGRESS","IN_PROGRESS","COMPLETED","COMPLETED","RESOLVED"];
+    const services  = ["Chapter QA","OpenServices","Control de Accesos","Arquitectura API Management","Arquitectura SPA","Arquitectura Canal ABSIS","SQUAD 3","SQUAD 4","SQUAD 5","Ciclo de Vida","Datapool","Transmisión de Ficheros","Autenticación","Arquitectura Batch","Cloud Products Squad"];
+    const sources   = ["Isla Indra","ABS - Other Departamental","ABS - ABSIS","Arquitectura Soluciones","OpenFront","Rally Software","Plataforma IA","Framework OpenMobile","Digitalización","GID nominales"];
+    const reasons   = ["Resolved with feedback","Resolved with feedback","Resolved with feedback","Inactivity without feedback",null];
+    const cplx      = ["LOW","LOW","MEDIUM","MEDIUM","HIGH",null];
+    const statuses  = ["IN_PROGRESS","IN_PROGRESS","COMPLETED","COMPLETED","RESOLVED"];
+    const ppms      = ["No crítico","No crítico","COSMOS","Normativo","TOP50","Tier 1"];
+    const closTypes = ["Resuelto","Resuelto","Resuelto","Leer manual","Asignación equivocada","Duplicado"];
+    const origins   = ["No aplica","OCP","JENKINS:consultas","Foro sobre ALM",null];
     const now = new Date();
     for (let m = 0; m < 12; m++) {
       const d    = new Date(now.getFullYear(), now.getMonth() - m, 1);
@@ -1001,10 +1073,13 @@
           id: "DEMO-"+Math.random().toString(36).slice(2), month,
           initDate: rd.toISOString(), endDate: end ? end.toISOString() : null,
           resolverService: services[Math.floor(Math.random()*services.length)],
-          sourceService: "Demo Source",
+          sourceService:   sources[Math.floor(Math.random()*sources.length)],
           status: st, closureReason: cr,
-          complexity: cr ? cplx[Math.floor(Math.random()*cplx.length)] : null,
+          complexity:  cr ? cplx[Math.floor(Math.random()*cplx.length)] : null,
           taskDueDate: due.toISOString(),
+          ppm:         ppms[Math.floor(Math.random()*ppms.length)],
+          closureType: cr ? closTypes[Math.floor(Math.random()*closTypes.length)] : null,
+          topicOrigin: cr ? origins[Math.floor(Math.random()*origins.length)] : null,
         });
       }
     }
@@ -1040,6 +1115,10 @@
     dashRenderServiceBars(inPeriod);
     dashRenderConsultasBar(filtered, months);
     dashRenderFeedbackDonut(filtered);
+    dashRenderFeedbackTrend(filtered, months);
+    dashRenderRequesters(filtered);
+    dashRenderClosureTypes(filtered);
+    dashRenderPPM(filtered);
     dashRenderComplexity(filtered);
 
     const main = document.getElementById("ttdb-cons-main");
@@ -1209,6 +1288,101 @@
     }).join("");
   }
 
+  function dashRenderFeedbackTrend(items, months) {
+    const svg = document.getElementById("ttdb-cons-fb-trend");
+    if (!svg) return;
+    const byM = {};
+    months.forEach(m => { byM[m] = { closed:0, fb:0 }; });
+    items.forEach(i => {
+      if (!byM[i.month] || i.status === "IN_PROGRESS") return;
+      byM[i.month].closed++;
+      if (i.closureReason === "Resolved with feedback") byM[i.month].fb++;
+    });
+    const rates = months.map(m => byM[m].closed > 0 ? Math.round(byM[m].fb / byM[m].closed * 100) : null);
+    const H=130, padT=14, padB=28, padL=28, padR=8, chartH=H-padT-padB;
+    const W = svg.parentElement ? (svg.parentElement.clientWidth||600) : 600;
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const n = months.length, step=(W-padL-padR)/n, barW=Math.max(6,step-4);
+    const mNames = ["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    let out = "";
+    // grid & 50% reference line
+    [0,25,50,75,100].forEach(pct => {
+      const y = padT + chartH - (pct/100)*chartH;
+      out += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="${pct===50?"#00C4E9":"#dde3e8"}" stroke-width="${pct===50?"1.5":"1"}" stroke-dasharray="${pct===50?"4 3":""}"/>`;
+      out += `<text x="${padL-4}" y="${y+3}" text-anchor="end" font-size="8" fill="${pct===50?"#00C4E9":"#8a9bb0"}">${pct}%</text>`;
+    });
+    months.forEach((m, i) => {
+      const x = padL + i*step + (step-barW)/2;
+      const r = rates[i];
+      const bH = r !== null ? (r/100)*chartH : 0;
+      const color = r === null ? "#edf0f3" : r >= 60 ? "#00CFB9" : r >= 35 ? "#f4c53d" : "#e83e8c";
+      if (bH > 0) out += `<rect x="${x}" y="${padT+chartH-bH}" width="${barW}" height="${bH}" fill="${color}" rx="2" opacity="${r===null?0.4:1}"/>`;
+      const mNum = parseInt(m.slice(5));
+      out += `<text x="${x+barW/2}" y="${H-14}" text-anchor="middle" font-size="8" fill="#8a9bb0">${mNames[mNum]}</text>`;
+      out += `<text x="${x+barW/2}" y="${H-4}" text-anchor="middle" font-size="7" fill="#c2cdd6">${m.slice(2,4)}</text>`;
+      if (r !== null) out += `<text x="${x+barW/2}" y="${padT+chartH-bH-3}" text-anchor="middle" font-size="7" font-weight="700" fill="${color}">${r}%</text>`;
+      else out += `<text x="${x+barW/2}" y="${padT+chartH/2}" text-anchor="middle" font-size="7" fill="#c2cdd6">—</text>`;
+    });
+    svg.innerHTML = out;
+  }
+
+  function dashRenderRequesters(items) {
+    const el = document.getElementById("ttdb-cons-requesters");
+    if (!el) return;
+    const counts = {};
+    items.forEach(i => { if (i.sourceService) counts[i.sourceService] = (counts[i.sourceService]||0)+1; });
+    const top = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const maxV = top[0]?.[1]||1, total = items.length||1;
+    el.innerHTML = top.map(([name,count]) =>
+      `<div class="ttdb-type-row">
+        <div class="ttdb-type-name" title="${name.replace(/"/g,"&quot;")}">${name.replace(/</g,"&lt;")}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1;width:auto"><div class="ttdb-type-bar-fill" style="width:${Math.round(count/maxV*100)}%;background:#00C4E9"></div></div>
+        <div class="ttdb-type-count" style="width:36px">${fmtN(count)}</div>
+        <div style="width:30px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pctN(count,total)}%</div>
+      </div>`
+    ).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
+  function dashRenderClosureTypes(items) {
+    const el = document.getElementById("ttdb-cons-closure");
+    if (!el) return;
+    const closed = items.filter(i => i.closureType);
+    if (!closed.length) { el.innerHTML = `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos (solo en cerradas)</div>`; return; }
+    const counts = {};
+    closed.forEach(i => { counts[i.closureType] = (counts[i.closureType]||0)+1; });
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const maxV = sorted[0]?.[1]||1, total = closed.length;
+    const colors = {"Resuelto":"#00CFB9","Leer manual":"#00C4E9","Asignación equivocada":"#f4c53d","Duplicado":"#e83e8c","Petición por Canal incorrecto":"#7c3aed"};
+    el.innerHTML = sorted.map(([name,count]) => {
+      const color = colors[name]||"#8a9bb0";
+      return `<div class="ttdb-type-row">
+        <div class="ttdb-type-name" title="${name.replace(/"/g,"&quot;")}" style="min-width:140px;max-width:140px">${name.replace(/</g,"&lt;")}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1;width:auto"><div class="ttdb-type-bar-fill" style="width:${Math.round(count/maxV*100)}%;background:${color}"></div></div>
+        <div class="ttdb-type-count" style="width:36px">${fmtN(count)}</div>
+        <div style="width:30px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pctN(count,total)}%</div>
+      </div>`;
+    }).join("");
+  }
+
+  function dashRenderPPM(items) {
+    const el = document.getElementById("ttdb-cons-ppm");
+    if (!el) return;
+    const counts = {};
+    items.forEach(i => { const p = i.ppm||"(sin PPM)"; counts[p]=(counts[p]||0)+1; });
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const maxV = sorted[0]?.[1]||1, total = items.length||1;
+    const colors = {"No crítico":"#8a9bb0","COSMOS":"#00C4E9","Normativo":"#7c3aed","TOP50":"#f4c53d","Tier 1":"#e83e8c","(sin PPM)":"#edf0f3"};
+    el.innerHTML = sorted.map(([name,count]) => {
+      const color = colors[name]||"#00C4E9";
+      return `<div class="ttdb-type-row">
+        <div class="ttdb-type-name" style="min-width:90px;max-width:90px">${name}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1;width:auto"><div class="ttdb-type-bar-fill" style="width:${Math.round(count/maxV*100)}%;background:${color}"></div></div>
+        <div class="ttdb-type-count" style="width:36px">${fmtN(count)}</div>
+        <div style="width:30px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pctN(count,total)}%</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
   // ── Public dashboard controls ──────────────────────────────────────
   window.__teamerToolkit._dashClose      = closeDashboard;
   window.__teamerToolkit._dashDemo       = () => {
@@ -1278,7 +1452,9 @@
     const f = state.dash.cons.items.filter(i =>
       new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc)
     );
-    dashRenderConsultasBar(f, dashBuildMonths(n));
+    const months = dashBuildMonths(n);
+    dashRenderConsultasBar(f, months);
+    dashRenderFeedbackTrend(f, months);
   };
   window.__teamerToolkit._dashWindow     = (n, el) => {
     el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t=>t.classList.remove("active"));
@@ -1317,7 +1493,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 17:06</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 17:24</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
