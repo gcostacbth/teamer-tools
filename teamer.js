@@ -645,6 +645,25 @@
           </div>
         </div>
 
+        <div class="ttdb-section-title">📋 SLA & Tipos de solicitud <span id="ttdb-join-badge" style="font-size:9px;font-weight:400;margin-left:6px;opacity:.6"></span></div>
+
+        <div class="ttdb-kpis" id="ttdb-sla-kpis"></div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>SLA por servicio</span>${ttip("Para cada servicio resolver: % de consultas cerradas dentro del plazo (processDueDate del proceso BPM). Requiere cruce con datos de procesos. Los servicios con mayor % de incumplimiento necesitan refuerzo o ajuste de SLA.")}
+            </div>
+            <div id="ttdb-sla-service"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Tipos de solicitud</span>${ttip("Campo requestTypeDescription del proceso BPM (sin el prefijo [ID]). Muestra qué plantillas de workflow se usan más. Cruzar con improcedentes para ver qué tipos se enrutan peor.")}
+            </div>
+            <div id="ttdb-req-types"></div>
+          </div>
+        </div>
+
         <div class="ttdb-section-title">🔴 Calidad & Routing · Improcedentes</div>
 
         <div class="ttdb-kpis" id="ttdb-imp-kpis"></div>
@@ -726,7 +745,11 @@
     state.dash.items      = [];
     state.dash.cons = { items:[], serviceFilter:"all", windowM:12, loaded:false, cancel:false };
 
+    // Load processes + topics in parallel from the start so both are ready to join.
+    // Processes finish first (smaller dataset); topics run in background and join
+    // automatically when done (joinAndEnrich fires from both loaders).
     loadDashData();
+    loadConsultasData();
   }
 
   function closeDashboard() {
@@ -748,6 +771,9 @@
   // de refresco que tenga el portal (Angular HttpInterceptor, axios interceptor, etc.)
   const KEEPALIVE_ENDPOINT = "/devops/dashboardTeamer/bis/notifications/count/employees/id";
   let _keepaliveTimer = null;
+  let _keepaliveRefs  = 0;  // ref-count so parallel loaders don't step on each other
+  function keepaliveAddRef() { if (++_keepaliveRefs === 1) startKeepalive(); }
+  function keepaliveRelease() { if (--_keepaliveRefs <= 0) { _keepaliveRefs = 0; stopKeepalive(); } }
 
   // ── triggerPortalNav ───────────────────────────────────────────────
   // Clicks an Angular router link in the portal page (under our overlay).
@@ -902,7 +928,7 @@
 
     let page = 0, done = false, totalPages = null;
     dashSetLoading(true, "Cargando procesos…", 0);
-    startKeepalive();   // ← mantener sesión activa durante toda la carga
+    keepaliveAddRef();  // ref-counted — stopKeepalive only when ALL loaders finish
     triggerPortalNav(); // ← navegación proactiva al inicio para asegurar token fresco
 
     try {
@@ -919,6 +945,7 @@
           const d = new Date(item.processInitDate);
           if (d < cutoff) { done = true; break; }
           state.dash.items.push({
+            id:       item.processInstanceId,   // join key with topics
             month:    d.toISOString().slice(0, 7),
             initDate: item.processInitDate,
             dueDate:  item.processDueDate  || null,
@@ -936,11 +963,15 @@
         await new Promise(r => setTimeout(r, 0));
       }
 
-      stopKeepalive();
+      keepaliveRelease();
       dashSetLoading(false);
-      if (!state.dash.cancel) dashRender();
+      if (!state.dash.cancel) {
+        dashRender();
+        // If topics are already loaded, enrich them now
+        if (state.dash.cons.loaded) joinAndEnrich();
+      }
     } catch (e) {
-      stopKeepalive();
+      keepaliveRelease();
       dashSetLoading(false);
       dashShowErr("Error: " + e.message + " — comprueba que el token de sesión sigue activo.");
       console.error("[TeamerToolkit/Dashboard]", e);
@@ -1214,7 +1245,7 @@
     cons.cancel = false;
     cons.items  = [];
     dashSetLoading(true, "Cargando consultas…", 0);
-    startKeepalive();
+    keepaliveAddRef();
     triggerPortalNav(); // ← navegación proactiva al inicio
     let page = 0, done = false, totalPages = null;
     try {
@@ -1248,12 +1279,14 @@
         dashSetLoading(true, `Consultas: pág. ${page}${totalPages?" / ~"+totalPages:""} · ${cons.items.length} topics`, pct);
         await new Promise(r => setTimeout(r, 0));
       }
-      stopKeepalive();
+      keepaliveRelease();
       cons.loaded = true;
+      // If processes are already loaded, enrich topics with SLA/type data
+      if (state.dash.items.length) joinAndEnrich();
       dashSetLoading(false);
       if (!cons.cancel) renderConsultas();
     } catch (e) {
-      stopKeepalive();
+      keepaliveRelease();
       dashSetLoading(false);
       dashShowErr("Error consultas: " + e.message);
     }
@@ -1295,6 +1328,10 @@
           ppm:         ppms[Math.floor(Math.random()*ppms.length)],
           closureType: cr ? closTypes[Math.floor(Math.random()*closTypes.length)] : null,
           topicOrigin: cr ? origins[Math.floor(Math.random()*origins.length)] : null,
+          // Join fields (from processes) — simulated for demo
+          processDueDate: due.toISOString(),
+          processStatus: st === "IN_PROGRESS" ? (Math.random()<.15?"Expired":"InProgress") : "Completed",
+          requestType: ["Consulta técnica de arquitectura","Búsqueda de consultas","Petición de acceso","Revisión de diseño","Consulta sobre normativa","Incidencia en plataforma","Alta de servicio","Baja de aplicación"][Math.floor(Math.random()*8)],
         });
       }
     }
@@ -1304,6 +1341,33 @@
     // Resetear el select de servicio para que se repopule
     const sel = document.getElementById("ttdb-svc-select");
     if (sel) while (sel.options.length > 1) sel.remove(1);
+  }
+
+  // ── Join processes ↔ topics on processInstanceId ──────────────────
+  // Enriches each topic (cons.items) with:
+  //   processDueDate  — SLA deadline from the BPM process
+  //   processStatus   — BPM status (Expired/Cancelled) independent of topic status
+  //   requestType     — cleaned requestTypeDescription (strip leading "[ID] ")
+  // Runs automatically when both loaders complete, in either order.
+  function joinAndEnrich() {
+    const procMap = {};
+    for (const p of state.dash.items) {
+      if (p.id) procMap[p.id] = p;
+    }
+    let enriched = 0;
+    for (const t of state.dash.cons.items) {
+      const p = procMap[t.id];
+      if (p) {
+        t.processDueDate   = p.dueDate   || null;
+        t.processStatus    = p.status    || null;
+        t.requestType      = (p.typeDesc || "").replace(/^\[\d+\]\s*/, "").trim();
+        enriched++;
+      }
+    }
+    log(`[join] ${enriched}/${state.dash.cons.items.length} topics enriched with process SLA data`);
+    // Re-render consultas if visible
+    const cm = document.getElementById("ttdb-cons-main");
+    if (cm && cm.style.display !== "none") renderConsultas();
   }
 
   function renderConsultas() {
@@ -1338,6 +1402,11 @@
     dashRenderClosureTypes(filtered);
     dashRenderPPM(filtered);
     dashRenderComplexity(filtered);
+
+    // SLA & tipos (cross with processes)
+    dashRenderSLAKPIs(filtered);
+    dashRenderSLAByService(filtered);
+    dashRenderRequestTypes(filtered);
 
     // Calidad & Routing — improcedentes analysis
     const closed = filtered.filter(i => i.closureType);
@@ -1713,6 +1782,126 @@
     }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
 
+  // ── SLA & tipos de solicitud (cross with processes) ───────────────
+  function dashRenderSLAKPIs(filtered) {
+    const el = document.getElementById("ttdb-sla-kpis");
+    const badge = document.getElementById("ttdb-join-badge");
+    if (!el) return;
+    const joined   = filtered.filter(i => i.processDueDate);
+    const coverage = filtered.length ? Math.round(joined.length / filtered.length * 100) : 0;
+    if (badge) badge.textContent = joined.length ? `${joined.length} topics cruzados con procesos (${coverage}%)` : "sin cruce — carga la pestaña Volumetría primero";
+
+    if (!joined.length) {
+      el.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:14px;color:#8a9bb0;font-size:11px">Sin datos de SLA — los procesos y consultas deben estar cargados en paralelo. Pulsa Demo o recarga la página.</div>`;
+      return;
+    }
+
+    const now = Date.now();
+    const closed = joined.filter(i => i.endDate);
+    const open   = joined.filter(i => !i.endDate);
+
+    // Closed: compliant if endDate ≤ processDueDate
+    const closedOk    = closed.filter(i => new Date(i.endDate) <= new Date(i.processDueDate)).length;
+    const closedBreak = closed.length - closedOk;
+    const slaRate     = closed.length ? Math.round(closedOk / closed.length * 100) : null;
+
+    // Open: already past SLA (processStatus Expired OR now > processDueDate)
+    const openBreached = open.filter(i => i.processStatus === "Expired" || (i.processDueDate && now > new Date(i.processDueDate))).length;
+
+    // Avg SLA window (processDueDate - initDate in days)
+    const windows = joined.map(i => {
+      const d = (new Date(i.processDueDate) - new Date(i.initDate)) / 86400000;
+      return isFinite(d) && d > 0 ? d : null;
+    }).filter(Boolean);
+    const avgWindow = windows.length ? (windows.reduce((a,b)=>a+b,0)/windows.length).toFixed(1) : null;
+
+    el.innerHTML = `
+      <div class="ttdb-kcard ttdb-kc-grn">
+        <div class="ttdb-kl">Cumplimiento SLA</div>
+        <div class="ttdb-kv">${slaRate !== null ? slaRate+"%" : "—"}</div>
+        <div class="ttdb-ksub">${closedOk} de ${closed.length} cerradas a tiempo</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-rose">
+        <div class="ttdb-kl">Incumplimientos</div>
+        <div class="ttdb-kv">${fmtN(closedBreak)}</div>
+        <div class="ttdb-ksub">cerradas fuera de plazo</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kcard-red">
+        <div class="ttdb-kl">Abiertas vencidas</div>
+        <div class="ttdb-kv">${fmtN(openBreached)}</div>
+        <div class="ttdb-ksub">IN_PROGRESS con SLA expirado</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-acc">
+        <div class="ttdb-kl">Plazo medio SLA</div>
+        <div class="ttdb-kv">${avgWindow ? avgWindow+"d" : "—"}</div>
+        <div class="ttdb-ksub">ventana media processDueDate</div>
+      </div>
+    `;
+  }
+
+  function dashRenderSLAByService(filtered) {
+    const el = document.getElementById("ttdb-sla-service");
+    if (!el) return;
+    const joined = filtered.filter(i => i.processDueDate && i.endDate);
+    if (!joined.length) { el.innerHTML = `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos cruzados</div>`; return; }
+
+    const map = {}; // service → { ok, breach }
+    for (const i of joined) {
+      const s = i.resolverService || "Desconocido";
+      if (!map[s]) map[s] = { ok:0, breach:0 };
+      if (new Date(i.endDate) <= new Date(i.processDueDate)) map[s].ok++;
+      else map[s].breach++;
+    }
+    const rows = Object.entries(map)
+      .map(([s,v]) => ({ s, ...v, total: v.ok+v.breach, rate: Math.round(v.ok/(v.ok+v.breach)*100) }))
+      .filter(r => r.total >= 2)
+      .sort((a,b) => a.rate - b.rate); // worst first
+
+    const maxTotal = Math.max(...rows.map(r=>r.total), 1);
+    el.innerHTML = rows.map(r => {
+      const okW  = (r.ok    / r.total * 100).toFixed(1);
+      const brW  = (r.breach / r.total * 100).toFixed(1);
+      const color = r.rate >= 80 ? "#00CFB9" : r.rate >= 50 ? "#f4c53d" : "#e83e8c";
+      return `<div class="ttdb-imp-row">
+        <div class="ttdb-imp-name" title="${r.s}">${r.s}</div>
+        <div class="ttdb-imp-stack" style="flex:0 0 ${Math.max(Math.round(r.total/maxTotal*160),16)}px">
+          <div class="ttdb-imp-seg" style="width:${okW}%;background:#00CFB9"></div>
+          <div class="ttdb-imp-seg" style="width:${brW}%;background:#e83e8c"></div>
+        </div>
+        <div style="width:34px;text-align:right;font-weight:700;font-size:10px;flex-shrink:0;color:${color}">${r.rate}%</div>
+        <div class="ttdb-imp-pct">${fmtN(r.total)}</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin suficientes datos (mínimo 2 por servicio)</div>`;
+  }
+
+  function dashRenderRequestTypes(filtered) {
+    const el = document.getElementById("ttdb-req-types");
+    if (!el) return;
+    const withType = filtered.filter(i => i.requestType);
+    if (!withType.length) { el.innerHTML = `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos cruzados</div>`; return; }
+
+    const map = {};
+    for (const i of withType) {
+      const t = i.requestType || "Sin tipo";
+      if (!map[t]) map[t] = { total:0, imp:0 };
+      map[t].total++;
+      if (isImprocedente(i)) map[t].imp++;
+    }
+    const rows = Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+    const maxTotal = rows[0]?.[1].total || 1;
+    el.innerHTML = rows.map(([type, v]) => {
+      const pct  = Math.round(v.total / maxTotal * 100);
+      const impPct = v.total ? Math.round(v.imp / v.total * 100) : 0;
+      const color = impPct > 40 ? "#e83e8c" : impPct > 20 ? "#f4a53d" : "#00CFB9";
+      return `<div class="ttdb-type-row" title="${type}">
+        <div class="ttdb-type-name">${type}</div>
+        <div class="ttdb-type-bar-wrap" style="width:90px"><div class="ttdb-type-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="ttdb-type-count">${fmtN(v.total)}</div>
+        <div style="width:30px;text-align:right;font-size:9px;color:${impPct>20?"#e83e8c":"#8a9bb0"};flex-shrink:0">${impPct}%↯</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
   // ── Calidad & Routing: Improcedentes ──────────────────────────────
   // Procedentes = Resuelto, Otros, Incidencia — todo lo demás es improcedente
   const PROC_TYPES = new Set(["Resuelto","Otros","Incidencia"]);
@@ -2004,20 +2193,13 @@
     if (tab === "vol") {
       if (main) main.style.display = "";
     } else if (tab === "cons") {
-      if (!state.dash.cons.loaded) {
-        loadConsultasData();
-      } else {
+      if (state.dash.cons.loaded) {
+        // Already loaded (parallel load finished) — render immediately
         if (cmain) cmain.style.display = "flex";
         renderConsultas();
-        setTimeout(() => {
-          const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
-          const svc = state.dash.cons.serviceFilter;
-          const f = state.dash.cons.items.filter(i => new Date(i.initDate)>=cutoff && (svc==="all"||i.resolverService===svc));
-          const months = dashBuildMonths(state.dash.cons.windowM);
-          dashRenderOpenClose(f, months);
-          dashRenderConsultasBar(f, months);
-          dashRenderFeedbackTrend(f, months);
-        }, 50);
+      } else {
+        // Still loading in background — show loading spinner; render fires when done
+        dashSetLoading(true, "Cargando consultas…", 0);
       }
     } else if (tab === "net") {
       if (nmain) nmain.style.display = "flex";
@@ -2108,7 +2290,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 21:15</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 21:55</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
