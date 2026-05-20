@@ -311,7 +311,8 @@
   // ==================================================================
 
   const DB_STYLE = `
-  #tt-dashboard{position:fixed;inset:0;z-index:2147483640;background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif;color:#000026;overflow-y:auto;display:flex;flex-direction:column}
+  @keyframes ttdb-open{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+  #tt-dashboard{position:fixed;inset:0;z-index:2147483640;background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif;color:#000026;overflow-y:auto;display:flex;flex-direction:column;animation:ttdb-open .28s cubic-bezier(.22,.68,0,1.15) both}
   .ttdb-header{background:#fff;border-bottom:2px solid #dde3e8;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex-shrink:0}
   .ttdb-title{font-size:17px;font-weight:800;letter-spacing:-.5px}
   .ttdb-sub{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#8a9bb0;margin-top:1px}
@@ -423,6 +424,16 @@
   .ttdb-thist-bar-fill{height:100%;border-radius:3px;transition:width .4s}
   .ttdb-thist-val{width:36px;text-align:right;font-weight:700;color:#2c3050;flex-shrink:0;font-size:10px}
   .ttdb-thist-pct{width:28px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0}
+
+  .ttdb-section-title{font-size:11px;font-weight:800;letter-spacing:.5px;color:#2c3050;padding:4px 0 2px;border-bottom:2px solid #dde3e8;margin-bottom:4px}
+  .ttdb-imp-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:10px}
+  .ttdb-imp-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c3050;min-width:0;font-size:10px}
+  .ttdb-imp-stack{flex:0 0 160px;height:12px;border-radius:3px;overflow:hidden;display:flex;background:#edf0f3}
+  .ttdb-imp-seg{height:100%;transition:width .45s}
+  .ttdb-imp-val{width:36px;text-align:right;font-weight:700;color:#e83e8c;flex-shrink:0;font-size:10px}
+  .ttdb-imp-pct{width:28px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0}
+  .ttdb-kcard-red::before{background:#e83e8c}
+  .ttdb-kcard-red .ttdb-kv{color:#e83e8c}
   `;
 
   function injectDashboardStyle() {
@@ -631,6 +642,32 @@
               <span>Complejidad</span>${ttip("Campo complexity de los topics cerrados (COMPLETED + RESOLVED). LOW / MEDIUM / HIGH. Solo disponible tras resolución. Aplica el filtro de servicio.")}
             </div>
             <div class="ttdb-cplx" id="ttdb-cons-cplx"></div>
+          </div>
+        </div>
+
+        <div class="ttdb-section-title">🔴 Calidad & Routing · Improcedentes</div>
+
+        <div class="ttdb-kpis" id="ttdb-imp-kpis"></div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Solicitantes × Tipo de cierre</span>${ttip("Para cada empresa solicitante (sourceITService): barra apilada mostrando Resueltos (verde) vs Improcedentes (rojo). Los improcedentes son cierres distintos a Resuelto / Otros / Incidencia. Cuanto mayor la franja roja, peor el routing desde ese equipo.")}
+          </div>
+          <div id="ttdb-imp-stacked"></div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Improcedentes × PPM</span>${ttip("Distribución de improcedentes por tipo de proyecto (ppm). Proyectos con mayor PPM que generan improcedentes indican un problema de routing prioritario.")}
+            </div>
+            <div id="ttdb-imp-ppm"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title">
+              <span>Improcedentes × Complejidad</span>${ttip("Los improcedentes de complejidad LOW son los más evitables: consultas simples enrutadas al servicio equivocado, duplicadas o que podrían resolverse con documentación.")}
+            </div>
+            <div id="ttdb-imp-cplx"></div>
           </div>
         </div>
       </div>
@@ -1237,6 +1274,14 @@
     dashRenderPPM(filtered);
     dashRenderComplexity(filtered);
 
+    // Calidad & Routing — improcedentes analysis
+    const closed = filtered.filter(i => i.closureType);
+    const imps   = closed.filter(isImprocedente);
+    dashRenderImpKPIs(closed);
+    dashRenderImpStacked(closed);
+    dashRenderImpPPM(imps);
+    dashRenderImpCplx(imps);
+
     const main = document.getElementById("ttdb-cons-main");
     if (main) main.style.display = "flex";
   }
@@ -1603,6 +1648,159 @@
     }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
 
+  // ── Calidad & Routing: Improcedentes ──────────────────────────────
+  // Procedentes = Resuelto, Otros, Incidencia — todo lo demás es improcedente
+  const PROC_TYPES = new Set(["Resuelto","Otros","Incidencia"]);
+  function isImprocedente(item) {
+    return item.closureType && !PROC_TYPES.has(item.closureType);
+  }
+
+  // Paleta de colores para tipos de cierre
+  const CLOSURE_COLORS = {
+    "Resuelto":              "#00CFB9",
+    "Otros":                 "#8ab4f8",
+    "Incidencia":            "#a8d5a2",
+    "Asignación equivocada": "#e83e8c",
+    "Leer manual":           "#f4a53d",
+    "Duplicado":             "#7c3aed",
+    "No aplica":             "#c2cdd6",
+  };
+  function closureColor(name) {
+    return CLOSURE_COLORS[name] || "#e83e8c";
+  }
+
+  function dashRenderImpKPIs(closed) {
+    const el = document.getElementById("ttdb-imp-kpis");
+    if (!el) return;
+    const imps = closed.filter(isImprocedente);
+    const total = closed.length;
+    const pctImp = total ? Math.round(imps.length / total * 100) : 0;
+    const lowImp = imps.filter(i => i.complexity === "LOW").length;
+    // top solicitante improcedente
+    const bySol = {};
+    for (const i of imps) { const s = i.sourceService || "Desconocido"; bySol[s] = (bySol[s]||0)+1; }
+    const topSol = Object.entries(bySol).sort((a,b)=>b[1]-a[1])[0];
+    el.innerHTML = `
+      <div class="ttdb-kcard ttdb-kcard-red">
+        <div class="ttdb-kl">Improcedentes</div>
+        <div class="ttdb-kv">${fmtN(imps.length)}</div>
+        <div class="ttdb-ksub">${pctImp}% del total cerrado</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kcard-red">
+        <div class="ttdb-kl">Evitables (LOW)</div>
+        <div class="ttdb-kv">${fmtN(lowImp)}</div>
+        <div class="ttdb-ksub">complejidad baja — routing directo</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-amb">
+        <div class="ttdb-kl">Top solicitante</div>
+        <div class="ttdb-kv" style="font-size:14px;letter-spacing:-.3px">${topSol?topSol[0]:"—"}</div>
+        <div class="ttdb-ksub">${topSol?topSol[1]+" improcedentes":""}</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-pur">
+        <div class="ttdb-kl">Tipos distintos</div>
+        <div class="ttdb-kv">${new Set(imps.map(i=>i.closureType)).size}</div>
+        <div class="ttdb-ksub">tipos de cierre improcedente</div>
+      </div>
+    `;
+  }
+
+  function dashRenderImpStacked(closed) {
+    const el = document.getElementById("ttdb-imp-stacked");
+    if (!el) return;
+    // Build per-solicitante breakdown by closureType
+    const map = {}; // { solicitante: { closureType: count } }
+    for (const i of closed) {
+      const s = i.sourceService || "Desconocido";
+      const c = i.closureType || "Sin cierre";
+      if (!map[s]) map[s] = {};
+      map[s][c] = (map[s][c] || 0) + 1;
+    }
+    // Sort by total improcedentes desc
+    const rows = Object.entries(map).map(([sol, byType]) => {
+      const total = Object.values(byType).reduce((a,b)=>a+b,0);
+      const imp   = Object.entries(byType).filter(([t])=>!PROC_TYPES.has(t)).reduce((a,[,v])=>a+v,0);
+      return { sol, byType, total, imp };
+    }).sort((a,b) => b.imp - a.imp).slice(0,12);
+
+    if (!rows.length) { el.innerHTML = `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`; return; }
+
+    // Collect all closure types seen, ordered: proc first, then imp
+    const allTypes = [...new Set(rows.flatMap(r => Object.keys(r.byType)))];
+    allTypes.sort((a,b) => {
+      const pa = PROC_TYPES.has(a) ? 0 : 1, pb = PROC_TYPES.has(b) ? 0 : 1;
+      return pa - pb || a.localeCompare(b);
+    });
+
+    // Legend
+    const legendHtml = allTypes.map(t =>
+      `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:#8a9bb0;margin-right:8px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${closureColor(t)};flex-shrink:0"></span>${t}</span>`
+    ).join("");
+
+    const maxTotal = Math.max(...rows.map(r => r.total), 1);
+    el.innerHTML = `<div style="display:flex;flex-wrap:wrap;margin-bottom:8px">${legendHtml}</div>` +
+      rows.map(r => {
+        const segments = allTypes.map(t => {
+          const cnt = r.byType[t] || 0;
+          if (!cnt) return "";
+          const w = (cnt / r.total * 100).toFixed(1);
+          const isImp = !PROC_TYPES.has(t);
+          return `<div class="ttdb-imp-seg" style="width:${w}%;background:${closureColor(t)};${isImp?"opacity:1":"opacity:.85"}" title="${t}: ${cnt}"></div>`;
+        }).join("");
+        const barW = Math.round(r.total / maxTotal * 100);
+        return `<div class="ttdb-imp-row">
+          <div class="ttdb-imp-name" title="${r.sol}">${r.sol}</div>
+          <div class="ttdb-imp-stack" style="flex:0 0 ${Math.max(barW,8)}px;max-width:200px">${segments}</div>
+          <div class="ttdb-imp-val">${r.imp ? fmtN(r.imp) : ""}</div>
+          <div class="ttdb-imp-pct" style="color:${r.imp>0?"#e83e8c":"#c2cdd6"}">${r.total ? Math.round(r.imp/r.total*100) : 0}%</div>
+        </div>`;
+      }).join("");
+  }
+
+  function dashRenderImpPPM(imps) {
+    const el = document.getElementById("ttdb-imp-ppm");
+    if (!el) return;
+    const map = {};
+    for (const i of imps) { const p = i.ppm || "Sin PPM"; map[p] = (map[p]||0)+1; }
+    const rows = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    const total = rows.reduce((s,[,c])=>s+c,0);
+    const PPM_COLORS = {"No crítico":"#c2cdd6","COSMOS":"#00C4E9","Normativo":"#f4c53d","TOP50":"#f4a53d","Tier 1":"#e83e8c","Sin PPM":"#edf0f3"};
+    el.innerHTML = rows.map(([ppm, cnt]) => {
+      const pct = total ? Math.round(cnt/total*100) : 0;
+      const color = PPM_COLORS[ppm] || "#8ab4f8";
+      return `<div class="ttdb-type-row">
+        <div class="ttdb-type-name">${ppm}</div>
+        <div class="ttdb-type-bar-wrap" style="width:100px"><div class="ttdb-type-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="ttdb-type-count">${fmtN(cnt)}</div>
+        <div style="width:28px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0">${pct}%</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
+  function dashRenderImpCplx(imps) {
+    const el = document.getElementById("ttdb-imp-cplx");
+    if (!el) return;
+    const LEVELS = [
+      { key:"LOW",    label:"LOW — evitable",  color:"#e83e8c", note:"enrutamiento o doc." },
+      { key:"MEDIUM", label:"MEDIUM",           color:"#f4a53d", note:"valorar casuística" },
+      { key:"HIGH",   label:"HIGH",             color:"#7c3aed", note:"caso límite" },
+      { key:null,     label:"Sin clasificar",   color:"#c2cdd6", note:"aún abierto o sin datos" },
+    ];
+    const counts = {};
+    for (const i of imps) { const k = i.complexity || null; counts[k] = (counts[k]||0)+1; }
+    const total = Object.values(counts).reduce((a,b)=>a+b,0);
+    el.innerHTML = `<div class="ttdb-cplx">` +
+      LEVELS.map(({key,label,color,note}) => {
+        const cnt = counts[key] || 0;
+        const pct = total ? Math.round(cnt/total*100) : 0;
+        return `<div class="ttdb-cplx-item" style="border-top:3px solid ${color}">
+          <div class="ttdb-cplx-val" style="color:${color}">${fmtN(cnt)}</div>
+          <div class="ttdb-cplx-lbl">${label}</div>
+          <div style="font-size:9px;color:#8a9bb0;margin-top:2px">${pct}% · ${note}</div>
+        </div>`;
+      }).join("") +
+    `</div>`;
+  }
+
   // ── Network / API Explorer ─────────────────────────────────────────
   function renderNetExplorer() {
     const el = document.getElementById("ttdb-net-list");
@@ -1845,7 +2043,7 @@
 
     panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 19:57</span></div>
+        <div><b>Teamer Toolkit</b> <span style="opacity:.5;font-size:10px">v5 · 2026-05-20 21:00</span></div>
         <div style="display:flex;gap:6px">
           <button id="tt-min"   style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">_</button>
           <button id="tt-close" style="cursor:pointer;border:0;border-radius:6px;padding:4px 8px">X</button>
