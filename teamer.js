@@ -181,9 +181,20 @@
 
   // ==== Token helper ====
   function getAuth() {
+    // 1. Más reciente del log de red (siempre refleja el último token en uso)
     for (const c of state.network) {
       const auth = c.reqHeaders?.Authorization || c.reqHeaders?.authorization;
       if (auth) return auth;
+    }
+    // 2. Escanear sessionStorage y localStorage (el portal puede guardarlo ahí)
+    for (const store of [sessionStorage, localStorage]) {
+      try {
+        for (let i = 0; i < store.length; i++) {
+          const v = store.getItem(store.key(i));
+          if (v && v.startsWith("Bearer ")) return v;
+          if (v && v.startsWith("eyJ"))     return "Bearer " + v;
+        }
+      } catch {}
     }
     return null;
   }
@@ -420,6 +431,7 @@
 
   function closeDashboard() {
     state.dash.cancel = true;
+    stopKeepalive();
     const ov = document.getElementById("tt-dashboard");
     if (ov) ov.remove();
     state.dash.overlay = null;
@@ -427,9 +439,35 @@
 
   // ── Dashboard data loading ──────────────────────────────────────────
 
-  // Espera hasta que aparezca un token más nuevo que `oldAuth` en el network log.
-  // El portal renueva el JWT en background (telemetría, polls) cada pocos segundos.
-  function waitForFreshToken(oldAuth, timeoutMs = 20000) {
+  // Keepalive: llama periódicamente a un endpoint ligero para que el servidor
+  // renueve el contexto de sesión y el portal refresque el token en background.
+  // Usa window.fetch (versión parcheada) para activar cualquier interceptor
+  // de refresco que tenga el portal (Angular HttpInterceptor, axios interceptor, etc.)
+  const KEEPALIVE_ENDPOINT = "/devops/dashboardTeamer/bis/notifications/count/employees/id";
+  let _keepaliveTimer = null;
+
+  function startKeepalive() {
+    stopKeepalive();
+    _keepaliveTimer = setInterval(async () => {
+      try {
+        const auth = getAuth();
+        const headers = { Accept: "application/json" };
+        if (auth) headers["Authorization"] = auth;
+        // Usar window.fetch (parcheado) — pasa por el stack de interceptores del portal
+        await window.fetch(`${CONFIG.dashboardApi}${KEEPALIVE_ENDPOINT}`, {
+          credentials: "include", headers,
+        });
+        log("[keepalive] ping OK");
+      } catch (e) { log("[keepalive] ping error:", e.message); }
+    }, 55_000); // cada 55 s — antes del timeout típico de 60 s
+  }
+
+  function stopKeepalive() {
+    if (_keepaliveTimer) { clearInterval(_keepaliveTimer); _keepaliveTimer = null; }
+  }
+
+  // Espera hasta que aparezca un token DIFERENTE al actual (red o storage).
+  function waitForFreshToken(oldAuth, timeoutMs = 25000) {
     return new Promise(resolve => {
       const start = Date.now();
       const iv = setInterval(() => {
@@ -496,6 +534,7 @@
 
     let page = 0, done = false, totalPages = null;
     dashSetLoading(true, "Cargando procesos…", 0);
+    startKeepalive();   // ← mantener sesión activa durante toda la carga
 
     try {
       while (!done && !state.dash.cancel) {
@@ -528,9 +567,11 @@
         await new Promise(r => setTimeout(r, 0));
       }
 
+      stopKeepalive();
       dashSetLoading(false);
       if (!state.dash.cancel) dashRender();
     } catch (e) {
+      stopKeepalive();
       dashSetLoading(false);
       dashShowErr("Error: " + e.message + " — comprueba que el token de sesión sigue activo.");
       console.error("[TeamerToolkit/Dashboard]", e);
