@@ -47,6 +47,11 @@
           if (window.__teamerToolkit?._dashDemo) {
             window.__teamerToolkit._dashDemo(); // loads demo data
           }
+          // Suppress any "Failed to fetch" errors from real API calls
+          // that fired before the demo cancelled them
+          setTimeout(() => {
+            document.getElementById("ttdb-err")?.classList.remove("on");
+          }, 400);
         }, 80);
       }
     }, 60);

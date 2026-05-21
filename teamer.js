@@ -831,6 +831,11 @@
   function keepaliveAddRef() { if (++_keepaliveRefs === 1) startKeepalive(); }
   function keepaliveRelease() { if (--_keepaliveRefs <= 0) { _keepaliveRefs = 0; stopKeepalive(); } }
 
+  // Loading-bar ref-count: bar only disappears when ALL active loaders finish
+  let _loadingRefs = 0;
+  function loadingAddRef()  { _loadingRefs++; }
+  function loadingRelease() { if (--_loadingRefs <= 0) { _loadingRefs = 0; dashSetLoading(false); } }
+
   // ── triggerPortalNav ───────────────────────────────────────────────
   // Clicks an Angular router link in the portal page (under our overlay).
   // The user sees nothing (our dashboard covers it at z-index:2147483640).
@@ -984,7 +989,8 @@
 
     let page = 0, done = false, totalPages = null;
     dashSetLoading(true, "Cargando procesos…", 0);
-    keepaliveAddRef();  // ref-counted — stopKeepalive only when ALL loaders finish
+    keepaliveAddRef();
+    loadingAddRef();    // ref-counted — bar stays until ALL loaders finish
     triggerPortalNav(); // ← navegación proactiva al inicio para asegurar token fresco
 
     try {
@@ -1020,7 +1026,7 @@
       }
 
       keepaliveRelease();
-      dashSetLoading(false);
+      loadingRelease();   // hides bar only when consultas also finishes
       if (!state.dash.cancel) {
         dashRender();
         // If topics are already loaded, enrich them now
@@ -1028,9 +1034,16 @@
       }
     } catch (e) {
       keepaliveRelease();
-      dashSetLoading(false);
-      dashShowErr("Error: " + e.message + " — comprueba que el token de sesión sigue activo.");
-      console.error("[TeamerToolkit/Dashboard]", e);
+      loadingRelease();
+      // Only show global red error if user is on the vol tab; otherwise store it silently
+      const activeTab = document.querySelector(".ttdb-ntab.active")?.id;
+      if (!activeTab || activeTab === "ttdb-nt-vol") {
+        dashShowErr("Error procesos: " + e.message + " — comprueba que el token sigue activo.");
+      } else {
+        state.dash.volError = e.message;
+        log("[vol] error en background:", e.message);
+      }
+      console.error("[TeamerToolkit/Dashboard/procesos]", e);
     }
   }
 
@@ -1302,6 +1315,7 @@
     cons.items  = [];
     dashSetLoading(true, "Cargando consultas…", 0);
     keepaliveAddRef();
+    loadingAddRef();    // ref-counted loading bar
     triggerPortalNav(); // ← navegación proactiva al inicio
     let page = 0, done = false, totalPages = null;
     try {
@@ -1339,20 +1353,30 @@
       cons.loaded = true;
       // If processes are already loaded, enrich topics with SLA/type data
       if (state.dash.items.length) joinAndEnrich();
-      dashSetLoading(false);
+      loadingRelease();   // hides bar only when processes also finished
       if (!cons.cancel) {
-        // Render whichever tab the user navigated to while loading
+        // Only render if the user is actually on the consultas/times tab.
+        // On vol/api tabs: data is cached — it will render when the user navigates there.
         const activeTab = document.querySelector(".ttdb-ntab.active")?.id;
         if (activeTab === "ttdb-nt-times") {
           renderTiempos();
-        } else {
+        } else if (activeTab === "ttdb-nt-cons") {
           renderConsultas();
         }
+        // vol / api / undefined → do nothing, don't touch the visible tab
       }
     } catch (e) {
       keepaliveRelease();
-      dashSetLoading(false);
-      dashShowErr("Error consultas: " + e.message);
+      loadingRelease();
+      // Only show global red error if user is watching the consultas/times tab
+      const activeTab = document.querySelector(".ttdb-ntab.active")?.id;
+      if (activeTab === "ttdb-nt-cons" || activeTab === "ttdb-nt-times") {
+        dashShowErr("Error consultas: " + e.message);
+      } else {
+        // Store it — will surface when user navigates to Consultas or T. Consultas
+        state.dash.cons.error = e.message;
+        log("[consultas] error en background:", e.message);
+      }
     }
   }
 
@@ -2701,6 +2725,11 @@
     if (svcHdr) svcHdr.style.display = (tab === "cons" || tab === "times") ? "flex" : "none";
     if (tab === "vol") {
       if (main) main.style.display = "";
+      // Surface any background error from the processes loader
+      if (state.dash.volError) {
+        dashShowErr("Error procesos: " + state.dash.volError + " — comprueba el token.");
+        state.dash.volError = null;
+      }
     } else if (tab === "cons") {
       if (state.dash.cons.loaded) {
         // Already loaded (parallel load finished) — render immediately
@@ -2710,11 +2739,20 @@
         // Still loading in background — show loading spinner; render fires when done
         dashSetLoading(true, "Cargando consultas…", 0);
       }
+      // Surface any background error from the consultas loader
+      if (state.dash.cons.error) {
+        dashShowErr("Error consultas: " + state.dash.cons.error);
+        state.dash.cons.error = null;
+      }
     } else if (tab === "times") {
       if (state.dash.cons.loaded) {
         renderTiempos();  // sets display:flex internally
       } else {
         dashSetLoading(true, "Cargando datos de tiempos…", 0);
+      }
+      if (state.dash.cons.error) {
+        dashShowErr("Error consultas: " + state.dash.cons.error);
+        state.dash.cons.error = null;
       }
     } else if (tab === "net") {
       if (nmain) nmain.style.display = "flex";
