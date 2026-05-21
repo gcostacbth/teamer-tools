@@ -435,6 +435,16 @@
   .ttdb-imp-pct{width:28px;text-align:right;font-size:9px;color:#8a9bb0;flex-shrink:0}
   .ttdb-kcard-red::before{background:#e83e8c}
   .ttdb-kcard-red .ttdb-kv{color:#e83e8c}
+
+  #ttdb-ct{display:none;position:fixed;z-index:2147483647;background:#000026;color:#fff;font-size:10px;line-height:1.65;padding:8px 12px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:220px;white-space:normal;pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;letter-spacing:0}
+  #ttdb-ct b{color:#00C4E9}
+  #ttdb-ct .ct-warn{color:#f4a53d}
+  #ttdb-ct .ct-red{color:#e83e8c}
+  #ttdb-ct .ct-grn{color:#00CFB9}
+  #ttdb-ct hr{border:none;border-top:1px solid rgba(255,255,255,.12);margin:5px 0}
+
+  .ttdb-backlog-top-row{display:grid;gap:6px;font-size:10px;align-items:center;padding:4px 0;border-bottom:1px solid #f5f7f9}
+  .ttdb-backlog-top-row:last-child{border-bottom:none}
   `;
 
   function injectDashboardStyle() {
@@ -543,6 +553,23 @@
 
       <div class="ttdb-cons-main" id="ttdb-cons-main" style="display:none">
         <div class="ttdb-kpis" id="ttdb-cons-kpis"></div>
+
+        <div class="ttdb-section-title">📬 Backlog actual · Consultas en curso</div>
+        <div class="ttdb-kpis" id="ttdb-backlog-kpis"></div>
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Distribución de edad</span>${ttip("¿Cuánto tiempo llevan abiertas las consultas IN_PROGRESS? Cada bucket muestra cuántas llevan ese tiempo esperando resolución. Los buckets naranja/rojo indican acumulación de deuda en el backlog.")}</div>
+            <div id="ttdb-backlog-age"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Backlog por servicio</span>${ttip("Número de consultas actualmente abiertas (IN_PROGRESS) por servicio resolver. El color de barra indica la mediana de edad: verde &lt; 3 días, azul &lt; 7 días, naranja &lt; 30 días, rojo &gt; 30 días. Pasa el ratón por cada fila para ver detalle.")}</div>
+            <div id="ttdb-backlog-svc"></div>
+          </div>
+        </div>
+        <div class="ttdb-card">
+          <div class="ttdb-card-title"><span>Las que más esperan · Top consultas abiertas</span>${ttip("Las 10 consultas IN_PROGRESS con más antigüedad en el backlog. Ordenadas de más antigua a más reciente. Rojo = más de 30 días · Naranja = más de 7 días · Azul = menos de 7 días.")}</div>
+          <div id="ttdb-backlog-top"></div>
+        </div>
 
         <div class="ttdb-card">
           <div class="ttdb-card-title">
@@ -794,6 +821,23 @@
       _tb.style.display = "none";
     });
 
+    // ── Chart tooltip (#ttdb-ct): follows mouse, triggered by [data-ct] elements ──
+    const _ct = document.createElement("div");
+    _ct.id = "ttdb-ct";
+    document.body.appendChild(_ct);
+    ov.addEventListener("mousemove", e => {
+      const target = e.target.closest("[data-ct]");
+      if (!target) { _ct.style.display = "none"; return; }
+      _ct.innerHTML = target.dataset.ct;
+      _ct.style.display = "block";
+      const x = e.clientX + 16, y = e.clientY + 16;
+      const w = _ct.offsetWidth  || 200;
+      const h = _ct.offsetHeight || 80;
+      _ct.style.left = Math.max(4, Math.min(x, window.innerWidth  - w - 8)) + "px";
+      _ct.style.top  = Math.max(4, Math.min(y, window.innerHeight - h - 8)) + "px";
+    });
+    ov.addEventListener("mouseleave", () => { _ct.style.display = "none"; });
+
     state.dash.overlay    = ov;
     state.dash.windowM    = 12;
     state.dash.typeFilter = "all";
@@ -816,6 +860,8 @@
     if (ov) ov.remove();
     const tb = document.getElementById("ttdb-tip-box");
     if (tb) tb.remove();
+    const ct = document.getElementById("ttdb-ct");
+    if (ct) ct.remove();
     state.dash.overlay = null;
   }
 
@@ -1141,6 +1187,16 @@
     return `<span class="ttdb-itip" data-tip="${enc}">i</span>`;
   }
 
+  // Encode an HTML string for safe embedding in a data-ct="..." attribute.
+  // The string is later used as innerHTML in the chart tooltip, so HTML tags are intentional.
+  function ctEnc(html) {
+    return html.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+  }
+  // Escape plain text for safe use as HTML text content inside a tooltip.
+  function esc(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
   function dashRenderKPIs(items) {
     const el = document.getElementById("ttdb-kpis");
     if (!el) return;
@@ -1329,6 +1385,8 @@
           if (!d || isNaN(d.getTime())) continue;   // skip items with no/bad date
           cons.items.push({
             id:             item.processInstanceId,
+            reqId:          item.idRequest || null,
+            title:          item.title || null,
             month:          d.toISOString().slice(0, 7),
             initDate:       item.initDate,
             endDate:        item.endDate || null,
@@ -1399,16 +1457,21 @@
       const d    = new Date(now.getFullYear(), now.getMonth() - m, 1);
       const month = d.toISOString().slice(0, 7);
       const vol   = 15 + Math.round(Math.random() * 25) + (m < 3 ? 10 : 0);
+      const demoTitles = ["Consulta sobre pipeline de CI/CD","Revisión de arquitectura microservicios","Error en integración OAuth","Timeout en llamadas a API Gateway","Duda sobre certificados SSL","Petición de acceso a repositorio","Problema con despliegue en OCP","Cómo configurar health checks","Revisión de diseño de base de datos","Migración a nuevo cluster Kubernetes","Configuración de alertas Prometheus","Duda sobre límites de rate limiting","Problema con logs en Elastic","Consulta sobre política de branching","Revisión de contrato OpenAPI"];
       for (let i = 0; i < vol; i++) {
         const rd  = new Date(d.getFullYear(), d.getMonth(), 1 + Math.floor(Math.random()*28));
         const st  = statuses[Math.floor(Math.random()*statuses.length)];
         const cr  = st !== "IN_PROGRESS" ? reasons[Math.floor(Math.random()*reasons.length)] : null;
         const end = st !== "IN_PROGRESS" ? new Date(rd.getTime() + (1+Math.random()*6)*86400000) : null;
         const due = new Date(rd.getTime() + (2+Math.floor(Math.random()*12))*86400000);
+        const svc = services[Math.floor(Math.random()*services.length)];
         cons.items.push({
-          id: "DEMO-"+Math.random().toString(36).slice(2), month,
+          id: "DEMO-"+Math.random().toString(36).slice(2),
+          reqId: "BIS-" + (1000 + Math.floor(Math.random()*9000)),
+          title: demoTitles[Math.floor(Math.random()*demoTitles.length)] + " · " + svc.split(" ")[0],
+          month,
           initDate: rd.toISOString(), endDate: end ? end.toISOString() : null,
-          resolverService: services[Math.floor(Math.random()*services.length)],
+          resolverService: svc,
           sourceService:   sources[Math.floor(Math.random()*sources.length)],
           status: st, closureReason: cr,
           complexity:  cr ? cplx[Math.floor(Math.random()*cplx.length)] : null,
@@ -1506,8 +1569,158 @@
     dashRenderImpPPM(imps);
     dashRenderImpCplx(imps);
 
+    // Backlog actual (IN_PROGRESS only)
+    const openItems = filtered.filter(i => i.status === "IN_PROGRESS");
+    dashRenderBacklogKPIs(openItems);
+    dashRenderBacklogAge(openItems);
+    dashRenderBacklogBySvc(openItems);
+    dashRenderBacklogTop(openItems);
+
     const main = document.getElementById("ttdb-cons-main");
     if (main) main.style.display = "flex";
+  }
+
+  // ── Backlog section ─────────────────────────────────────────────────
+  function dashRenderBacklogKPIs(openItems) {
+    const el = document.getElementById("ttdb-backlog-kpis");
+    if (!el) return;
+    const now = Date.now();
+    const ages = openItems.map(i => (now - new Date(i.initDate).getTime()) / 3600000).filter(h => isFinite(h) && h >= 0);
+    const total  = openItems.length;
+    const oldest = ages.length ? Math.max(...ages) : 0;
+    const median = ages.length ? percentile(ages, 50) : null;
+    const gt7d   = ages.filter(h => h > 168).length;
+    const gt30d  = ages.filter(h => h > 720).length;
+    if (!total) {
+      el.innerHTML = `<div style="color:#00CFB9;font-size:12px;padding:8px 0">✓ No hay consultas abiertas en el periodo seleccionado</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="ttdb-kcard ttdb-kc-pur">
+        <div class="ttdb-kl">Abiertas ahora${ttip("Consultas con status IN_PROGRESS en el periodo de 12 meses. Aplicado el filtro de servicio.")}</div>
+        <div class="ttdb-kv">${fmtN(total)}</div>
+        <div class="ttdb-ksub">en el backlog actual</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-amb">
+        <div class="ttdb-kl">Mediana de edad${ttip("El 50% del backlog lleva menos tiempo que este valor. Un aumento progresivo indica que las consultas entran más rápido de lo que se cierran.")}</div>
+        <div class="ttdb-kv">${median !== null ? fmtHours(median) : "—"}</div>
+        <div class="ttdb-ksub">el 50% lleva menos tiempo</div>
+      </div>
+      <div class="ttdb-kcard ${gt7d > Math.ceil(total*0.15) ? "ttdb-kcard-red" : "ttdb-kc-grn"}">
+        <div class="ttdb-kl">Más de 7 días${ttip("Consultas que llevan más de 7 días abiertas. Más del 15% del backlog en este estado es señal de alerta.")}</div>
+        <div class="ttdb-kv">${fmtN(gt7d)}</div>
+        <div class="ttdb-ksub">${pctN(gt7d, total)}% del backlog</div>
+      </div>
+      <div class="ttdb-kcard ${gt30d > 0 ? "ttdb-kcard-red" : "ttdb-kc-grn"}">
+        <div class="ttdb-kl">Más de 30 días${ttip("Consultas con más de 30 días de antigüedad sin cerrarse. Cualquier valor > 0 requiere atención inmediata.")}</div>
+        <div class="ttdb-kv">${fmtN(gt30d)}</div>
+        <div class="ttdb-ksub">más antigua: ${fmtHours(oldest)}</div>
+      </div>
+    `;
+  }
+
+  function dashRenderBacklogAge(openItems) {
+    const el = document.getElementById("ttdb-backlog-age");
+    if (!el) return;
+    if (!openItems.length) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin consultas abiertas</div>`;
+      return;
+    }
+    const now = Date.now();
+    const buckets = [
+      { lbl:"< 1d",    min:0,    max:24,       color:"#00CFB9", desc:"Recién abiertas" },
+      { lbl:"1–3d",    min:24,   max:72,        color:"#00C4E9", desc:"Primer seguimiento" },
+      { lbl:"3–7d",    min:72,   max:168,       color:"#7c3aed", desc:"Requieren atención" },
+      { lbl:"7–14d",   min:168,  max:336,       color:"#f4c53d", desc:"Alerta: más de 1 semana" },
+      { lbl:"14–30d",  min:336,  max:720,       color:"#f4a53d", desc:"Crítico: 2+ semanas" },
+      { lbl:"> 30d",   min:720,  max:Infinity,  color:"#e83e8c", desc:"Urgente: más de 1 mes" },
+    ];
+    const counts = buckets.map(b => openItems.filter(i => {
+      const h = (now - new Date(i.initDate).getTime()) / 3600000;
+      return isFinite(h) && h >= b.min && h < b.max;
+    }).length);
+    const total = openItems.length, maxC = Math.max(...counts, 1);
+    el.innerHTML = buckets.map((b, i) => {
+      const ct = ctEnc(`<b>${esc(b.lbl)}</b> · ${esc(b.desc)}<hr>${counts[i]} consultas<br><span class="ct-grn">${pctN(counts[i],total)}%</span> del backlog`);
+      return `<div class="ttdb-thist-row" data-ct="${ct}">
+        <div class="ttdb-thist-lbl">${b.lbl}</div>
+        <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
+        <div class="ttdb-thist-val">${counts[i]}</div>
+        <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
+      </div>`;
+    }).join("");
+  }
+
+  function dashRenderBacklogBySvc(openItems) {
+    const el = document.getElementById("ttdb-backlog-svc");
+    if (!el) return;
+    if (!openItems.length) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin consultas abiertas</div>`;
+      return;
+    }
+    const now = Date.now();
+    const bySvc = {};
+    openItems.forEach(i => {
+      const s = i.resolverService || "Sin servicio";
+      if (!bySvc[s]) bySvc[s] = { count:0, ages:[] };
+      bySvc[s].count++;
+      const h = (now - new Date(i.initDate).getTime()) / 3600000;
+      if (isFinite(h) && h >= 0) bySvc[s].ages.push(h);
+    });
+    const rows = Object.entries(bySvc)
+      .map(([s, d]) => ({
+        s, count: d.count,
+        medAge: d.ages.length ? percentile(d.ages, 50) : 0,
+        maxAge: d.ages.length ? Math.max(...d.ages) : 0,
+        gt7d:   d.ages.filter(h=>h>168).length,
+      }))
+      .sort((a,b) => b.count - a.count);
+    const maxCount = rows[0].count;
+    el.innerHTML = rows.map(r => {
+      const w = Math.round(r.count / maxCount * 100);
+      const color = r.medAge > 720 ? "#e83e8c" : r.medAge > 168 ? "#f4a53d" : r.medAge > 72 ? "#00C4E9" : "#00CFB9";
+      const gt7pct = pctN(r.gt7d, r.count);
+      const ct = ctEnc(`<b>${esc(r.s)}</b><hr>${r.count} consultas abiertas<br>Mediana de edad: <b>${esc(fmtHours(r.medAge))}</b><br>Más antigua: <b>${esc(fmtHours(r.maxAge))}</b><br><span class="${r.gt7d>0?"ct-warn":"ct-grn"}">+7d: ${r.gt7d} (${gt7pct}%)</span>`);
+      return `<div class="ttdb-type-row" data-ct="${ct}">
+        <div class="ttdb-type-name" title="${esc(r.s)}" style="min-width:150px;max-width:150px">${esc(r.s)}</div>
+        <div class="ttdb-type-bar-wrap" style="flex:1"><div class="ttdb-type-bar-fill" style="width:${w}%;background:${color}"></div></div>
+        <div class="ttdb-type-count">${r.count}</div>
+        <div style="width:42px;text-align:right;font-size:9px;color:${color};font-weight:700">${fmtHours(r.medAge)}</div>
+      </div>`;
+    }).join("");
+  }
+
+  function dashRenderBacklogTop(openItems) {
+    const el = document.getElementById("ttdb-backlog-top");
+    if (!el) return;
+    if (!openItems.length) {
+      el.innerHTML = `<div style="color:#00CFB9;font-size:11px;padding:10px 0">✓ Sin consultas abiertas en el periodo seleccionado</div>`;
+      return;
+    }
+    const now = Date.now();
+    const withAge = openItems.map(i => ({ ...i, ageH: (now - new Date(i.initDate).getTime()) / 3600000 }))
+      .filter(i => isFinite(i.ageH));
+    const top = withAge.sort((a,b) => b.ageH - a.ageH).slice(0, 10);
+    const colorFor = h => h > 720 ? "#e83e8c" : h > 168 ? "#f4a53d" : "#00C4E9";
+    const cols = "minmax(0,1fr) 160px 76px 62px 52px";
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:${cols};gap:6px;font-size:9px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:.8px;padding:0 2px 6px;border-bottom:1px solid #edf0f3;margin-bottom:2px">
+        <div>Consulta / ID</div><div>Servicio</div><div>PPM</div><div>Complejidad</div><div style="text-align:right">Edad</div>
+      </div>
+      ${top.map(i => {
+        const color = colorFor(i.ageH);
+        const label = i.title ? esc(i.title) : (i.reqId ? esc(i.reqId) : esc(i.id));
+        const svc   = esc(i.resolverService || "—");
+        return `<div class="ttdb-backlog-top-row" style="grid-template-columns:${cols}">
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c3050" title="${label}">${label}</div>
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8a9bb0;font-size:9px" title="${svc}">${svc}</div>
+          <div style="color:#8a9bb0;font-size:9px">${esc(i.ppm || "—")}</div>
+          <div style="color:#8a9bb0;font-size:9px">${esc(i.complexity || "—")}</div>
+          <div style="text-align:right;font-weight:700;color:${color}">${fmtHours(i.ageH)}</div>
+        </div>`;
+      }).join("")}
+      ${withAge.length > 10 ? `<div style="font-size:9px;color:#8a9bb0;margin-top:6px;padding-top:4px;border-top:1px solid #f0f2f5">${withAge.length - 10} consultas más en el backlog</div>` : ""}
+    `;
   }
 
   function fmtDays(ms) {
@@ -2310,6 +2523,15 @@
       out += `<circle cx="${cx}" cy="${cy}" r="3" fill="#00CFB9" stroke="#fff" stroke-width="1.5"/>`;
       out += `<text x="${cx}" y="${(parseFloat(cy)-6).toFixed(1)}" text-anchor="middle" font-size="7" font-weight="700" fill="#00CFB9">${fmtHours(d.p50)}</text>`;
     });
+    // Invisible hover columns for tooltip
+    mData.forEach((d, i) => {
+      const cx = padL + i*step;
+      const lbl = months[i] || "";
+      const ct = d.n
+        ? ctEnc(`<b>${esc(lbl)}</b><hr>Mediana p50: <b>${esc(fmtHours(d.p50))}</b><br>Promedio: <b>${esc(fmtHours(d.avg))}</b><br>P90: <b>${esc(fmtHours(d.p90))}</b><hr><span style="color:#8a9bb0">${d.n} consultas cerradas</span>`)
+        : ctEnc(`<b>${esc(lbl)}</b><hr><span style="color:#8a9bb0">Sin cierres ese mes</span>`);
+      out += `<rect x="${cx.toFixed(1)}" y="${padT}" width="${step.toFixed(1)}" height="${chartH}" fill="transparent" data-ct="${ct}"/>`;
+    });
     svg.innerHTML = out;
   }
 
@@ -2337,14 +2559,15 @@
       }
     });
     const total = resHours.length, maxC = Math.max(...counts, 1);
-    el.innerHTML = buckets.map((b,i) =>
-      `<div class="ttdb-thist-row">
+    el.innerHTML = buckets.map((b,i) => {
+      const ct = ctEnc(`<b>${esc(b.lbl)}</b><hr>${counts[i]} consultas cerradas<br><span class="ct-grn">${pctN(counts[i],total)}%</span> del total`);
+      return `<div class="ttdb-thist-row" data-ct="${ct}">
         <div class="ttdb-thist-lbl">${b.lbl}</div>
         <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
         <div class="ttdb-thist-val">${counts[i]}</div>
         <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
-      </div>`
-    ).join("");
+      </div>`;
+    }).join("");
   }
 
   function dashRenderTimesAging(openItems) {
@@ -2375,14 +2598,16 @@
     });
     const total = openItems.length, maxC = Math.max(...counts, 1);
     el.innerHTML = `<div style="font-size:10px;color:#8a9bb0;margin-bottom:6px"><b style="color:#2c3050">${total}</b> en curso ahora</div>` +
-      buckets.map((b,i) =>
-        `<div class="ttdb-thist-row">
+      buckets.map((b,i) => {
+        const urgNote = b.color === "#e83e8c" || b.color === "#991b1b" ? " · <span class='ct-red'>Escalación urgente</span>" : b.color === "#e07b39" || b.color === "#f4a53d" ? " · <span class='ct-warn'>Requiere seguimiento</span>" : "";
+        const ct = ctEnc(`<b>${esc(b.lbl)}</b>${urgNote}<hr>${counts[i]} consultas en espera<br><span class="ct-grn">${pctN(counts[i],total)}%</span> del backlog activo`);
+        return `<div class="ttdb-thist-row" data-ct="${ct}">
           <div class="ttdb-thist-lbl">${b.lbl}</div>
           <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
           <div class="ttdb-thist-val">${counts[i]}</div>
           <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
-        </div>`
-      ).join("");
+        </div>`;
+      }).join("");
   }
 
   function dashRenderTimesByService(items) {
@@ -2417,8 +2642,17 @@
       const avgw = Math.round(r.avg/maxP90*100);
       const p90w = Math.round(r.p90/maxP90*100);
       const c    = colorFor(r.p50);
-      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:10px">
-        <div style="flex:0 0 150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c3050" title="${r.s}">${r.s}</div>
+      const skew = r.avg / r.p50;
+      const skewNote = skew > 1.8 ? `<br><span class="ct-warn">Media muy alta — hay casos extremos</span>` : skew > 1.3 ? `<br><span class="ct-warn">Cola larga detectada</span>` : "";
+      const ct = ctEnc(
+        `<b>${esc(r.s)}</b><hr>` +
+        `Mediana (p50): <b>${esc(fmtHours(r.p50))}</b><br>` +
+        `Promedio: <b>${esc(fmtHours(r.avg))}</b><br>` +
+        `P90: <b>${esc(fmtHours(r.p90))}</b>${skewNote}<hr>` +
+        `<span style="color:#8a9bb0">${r.n} consultas cerradas</span>`
+      );
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:10px" data-ct="${ct}">
+        <div style="flex:0 0 150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c3050" title="${esc(r.s)}">${esc(r.s)}</div>
         <div style="flex:1;position:relative;height:14px;min-width:60px">
           <div style="position:absolute;inset:3px 0;background:#edf0f3;border-radius:4px;width:${p90w}%"></div>
           <div style="position:absolute;inset:3px 0;background:rgba(0,196,233,.35);border-radius:4px;width:${avgw}%"></div>
@@ -2429,7 +2663,7 @@
         <div style="flex:0 0 22px;text-align:right;font-size:9px;color:#c2cdd6">${r.n}×</div>
       </div>`;
     }).join("") +
-    `<div style="font-size:9px;color:#c2cdd6;margin-top:6px">■ p50 &nbsp; ░ promedio &nbsp; □ p90 &nbsp;·&nbsp; Ordenado de más rápido (arriba) a más lento</div>`;
+    `<div style="font-size:9px;color:#c2cdd6;margin-top:6px">■ p50 &nbsp; ░ promedio &nbsp; □ p90 &nbsp;·&nbsp; Ordenado de más rápido (arriba) a más lento · pasa el ratón para ver detalle</div>`;
   }
 
   function dashRenderTimesByComplexity(items) {
@@ -2463,7 +2697,8 @@
       const p50 = percentile(hs, 50);
       const avg = hs.reduce((a,b)=>a+b,0)/hs.length;
       const p90 = percentile(hs, 90);
-      return `<div style="margin-bottom:14px">
+      const ct = ctEnc(`<b style="color:${color}">${esc(label)}</b> · ${hs.length} consultas<hr>Mediana (p50): <b>${esc(fmtHours(p50))}</b><br>Promedio: <b>${esc(fmtHours(avg))}</b><br>P90: <b>${esc(fmtHours(p90))}</b>`);
+      return `<div style="margin-bottom:14px" data-ct="${ct}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
           <div style="font-size:10px;font-weight:700;color:${color}">${label} <span style="font-weight:400;color:#8a9bb0">(${hs.length})</span></div>
           <div style="display:flex;gap:10px;font-size:9px;color:#8a9bb0">
@@ -2505,12 +2740,16 @@
     let out = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block">`;
     DAY.forEach((name, d) => {
       const v   = avgs[d];
+      const n   = byDay[d].length;
       const x   = padL + d*step + (step-barW)/2;
       const bH  = v !== null ? (v/maxA)*chartH : 0;
       const isWknd = d===0||d===6;
       const col = colorFor(v);
-      if (bH>0) out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-bH).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" rx="2" opacity="${isWknd?0.55:1}"/>`;
-      else       out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-2).toFixed(1)}" width="${barW.toFixed(1)}" height="2" fill="#edf0f3" rx="1"/>`;
+      const ct  = v !== null
+        ? ctEnc(`<b>${esc(name)}</b>${isWknd?" · fin de semana":""}<hr>T. medio: <b>${esc(fmtHours(v))}</b><br>${n} consultas`)
+        : ctEnc(`<b>${esc(name)}</b><hr><span style="color:#8a9bb0">Sin datos suficientes (mín. 2)</span>`);
+      if (bH>0) out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-bH).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" rx="2" opacity="${isWknd?0.55:1}" data-ct="${ct}"/>`;
+      else       out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-2).toFixed(1)}" width="${barW.toFixed(1)}" height="${chartH}" fill="transparent" rx="1" data-ct="${ct}"/>`;
       out += `<text x="${(x+barW/2).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="8" fill="${isWknd?"#c2cdd6":"#8a9bb0"}">${name}</text>`;
       if (v !== null) out += `<text x="${(x+barW/2).toFixed(1)}" y="${(padT+chartH-bH-3).toFixed(1)}" text-anchor="middle" font-size="7" fill="${col}">${fmtHours(v)}</text>`;
     });
