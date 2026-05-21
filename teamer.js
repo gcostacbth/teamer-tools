@@ -385,6 +385,7 @@
   .ttdb-svc-select{font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid #dde3e8;background:#fff;color:#2c3050;cursor:pointer;min-width:220px}
   .ttdb-svc-select:focus{outline:2px solid #00C4E9;border-color:#00C4E9}
   .ttdb-cons-main{padding:18px 24px;display:flex;flex-direction:column;gap:14px;flex:1}
+  .ttdb-times-main{padding:18px 24px;display:flex;flex-direction:column;gap:14px;flex:1}
 
   .ttdb-cplx{display:flex;gap:8px;flex-wrap:wrap}
   .ttdb-cplx-item{flex:1;min-width:90px;background:#f5f7f9;border:1px solid #dde3e8;border-radius:8px;padding:10px 12px;text-align:center}
@@ -475,6 +476,7 @@
       <div class="ttdb-nav">
         <div class="ttdb-ntab active" id="ttdb-nt-vol"  onclick="window.__teamerToolkit._dashNav('vol',this)">📊 Volumetría</div>
         <div class="ttdb-ntab"        id="ttdb-nt-cons" onclick="window.__teamerToolkit._dashNav('cons',this)">💬 Consultas</div>
+        <div class="ttdb-ntab"        id="ttdb-nt-times" onclick="window.__teamerToolkit._dashNav('times',this)">⏱ T. Consultas</div>
         <div class="ttdb-ntab"        id="ttdb-nt-net"  onclick="window.__teamerToolkit._dashNav('net',this)">📡 API</div>
       </div>
 
@@ -691,6 +693,59 @@
         </div>
       </div>
 
+      <div class="ttdb-times-main" id="ttdb-times-main" style="display:none">
+        <div class="ttdb-kpis" id="ttdb-times-kpis"></div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Evolución mensual de tiempos</span>${ttip("Evolución del tiempo de resolución mes a mes. Verde continuo: mediana p50 — el 50% de consultas se resuelve en ≤ este tiempo. Azul: promedio. Ámbar punteado: P90 — lo que supera este umbral son los casos problemáticos. Si el promedio se aleja mucho del p50, hay casos extremos que están inflando la media.")}
+            <div class="ttdb-tabs">
+              <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashTimesWindow(12,this)">12m</div>
+              <div class="ttdb-tab" onclick="window.__teamerToolkit._dashTimesWindow(6,this)">6m</div>
+              <div class="ttdb-tab" onclick="window.__teamerToolkit._dashTimesWindow(3,this)">3m</div>
+            </div>
+          </div>
+          <div class="ttdb-legend">
+            <div class="ttdb-leg"><div class="ttdb-leg-dot" style="background:#00CFB9"></div>Mediana p50</div>
+            <div class="ttdb-leg"><div class="ttdb-leg-dot" style="background:#00C4E9"></div>Promedio</div>
+            <div class="ttdb-leg"><div class="ttdb-leg-dot" style="background:#f4c53d"></div>P90</div>
+          </div>
+          <div class="ttdb-chart-scroll"><svg id="ttdb-times-trend" style="display:block;width:100%;min-width:480px" height="180"></svg></div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Distribución por tiempo</span>${ttip("Histograma del tiempo de resolución (endDate − initDate) de los topics cerrados. 8 buckets de granularidad fina. Permite ver si la mayoría se resuelve rápido o hay una cola larga de casos lentos que desplazan la media hacia arriba.")}</div>
+            <div id="ttdb-times-hist"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Aging · en curso</span>${ttip("¿Cuánto tiempo llevan abiertas las consultas actualmente IN_PROGRESS? Los buckets naranja/rojo (>7d) son los que más fricción generan y los que hay que escalar.")}</div>
+            <div id="ttdb-times-aging"></div>
+          </div>
+        </div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title"><span>Tiempos por servicio</span>${ttip("Para cada servicio resolver: barra sólida = mediana p50 · franja transparente naranja = promedio · fondo claro = P90. Ordenados de más rápido (arriba) a más lento (abajo). Mínimo 2 consultas cerradas para aparecer.")}</div>
+          <div id="ttdb-times-service"></div>
+        </div>
+
+        <div class="ttdb-row2">
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Por complejidad</span>${ttip("Compara p50 / promedio / P90 entre niveles de complejidad (LOW / MEDIUM / HIGH). Valida si la complejidad declarada correlaciona con el esfuerzo real. Si LOW tarda casi igual que HIGH, algo falla en la clasificación o el enrutamiento.")}</div>
+            <div id="ttdb-times-cplx"></div>
+          </div>
+          <div class="ttdb-card">
+            <div class="ttdb-card-title"><span>Por día de apertura</span>${ttip("Tiempo medio de resolución según el día de la semana en que se abrió la consulta. Detecta el efecto fin de semana: consultas abiertas viernes o jueves suelen tardar más porque hay menos disponibilidad inmediata. Mínimo 2 datos por día.")}</div>
+            <div id="ttdb-times-weekday"></div>
+          </div>
+        </div>
+
+        <div class="ttdb-card">
+          <div class="ttdb-card-title"><span>¿Dónde se encallan? · Consultas &gt;7 días</span>${ttip("Consultas cerradas que tardaron más de 7 días + consultas actualmente abiertas con más de 7 días de antigüedad. Desglose por servicio, complejidad y PPM — identifica los vectores de encallamiento más frecuentes.")}</div>
+          <div id="ttdb-times-bottleneck"></div>
+        </div>
+      </div>
+
       <div class="ttdb-net-main" id="ttdb-net-main" style="display:none">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:4px">
           <span style="font-size:10px;font-weight:700;color:#8a9bb0;text-transform:uppercase;letter-spacing:1px">Filtro</span>
@@ -743,7 +798,8 @@
     state.dash.windowM    = 12;
     state.dash.typeFilter = "all";
     state.dash.items      = [];
-    state.dash.cons = { items:[], serviceFilter:"all", windowM:12, loaded:false, cancel:false };
+    state.dash.cons        = { items:[], serviceFilter:"all", windowM:12, loaded:false, cancel:false };
+    state.dash.timesWindowM = 12;
 
     // Load processes + topics in parallel from the start so both are ready to join.
     // Processes finish first (smaller dataset); topics run in background and join
@@ -1284,7 +1340,15 @@
       // If processes are already loaded, enrich topics with SLA/type data
       if (state.dash.items.length) joinAndEnrich();
       dashSetLoading(false);
-      if (!cons.cancel) renderConsultas();
+      if (!cons.cancel) {
+        // Render whichever tab the user navigated to while loading
+        const activeTab = document.querySelector(".ttdb-ntab.active")?.id;
+        if (activeTab === "ttdb-nt-times") {
+          renderTiempos();
+        } else {
+          renderConsultas();
+        }
+      }
     } catch (e) {
       keepaliveRelease();
       dashSetLoading(false);
@@ -1365,9 +1429,11 @@
       }
     }
     log(`[join] ${enriched}/${state.dash.cons.items.length} topics enriched with process SLA data`);
-    // Re-render consultas if visible
+    // Re-render whichever tab is currently visible
     const cm = document.getElementById("ttdb-cons-main");
     if (cm && cm.style.display !== "none") renderConsultas();
+    const tm = document.getElementById("ttdb-times-main");
+    if (tm && tm.style.display !== "none") renderTiempos();
   }
 
   function renderConsultas() {
@@ -2055,6 +2121,448 @@
     `</div>`;
   }
 
+  // ── Análisis de Tiempos ────────────────────────────────────────────
+
+  function percentile(arr, p) {
+    if (!arr.length) return null;
+    const s = [...arr].sort((a, b) => a - b);
+    const i = (p / 100) * (s.length - 1);
+    const lo = Math.floor(i), hi = Math.ceil(i);
+    return s[lo] + (s[hi] - s[lo]) * (i - lo);
+  }
+
+  function fmtHours(h) {
+    if (h === null || h === undefined || !isFinite(h)) return "—";
+    if (h < 1)   return "<1h";
+    if (h < 24)  return Math.round(h) + "h";
+    if (h < 72)  return (h / 24).toFixed(1) + "d";
+    return Math.round(h / 24) + "d";
+  }
+
+  function renderTiempos() {
+    if (!state.dash.cons.loaded) return;
+    const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+    const svc      = state.dash.cons.serviceFilter;
+    const inPeriod = state.dash.cons.items.filter(i => new Date(i.initDate) >= cutoff);
+    const filtered = svc === "all" ? inPeriod : inPeriod.filter(i => i.resolverService === svc);
+    const closed   = filtered.filter(i => i.endDate && i.initDate);
+    const resHours = closed.map(i => {
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      return isFinite(h) && h >= 0 ? h : null;
+    }).filter(x => x !== null);
+    const months = dashBuildMonths(state.dash.timesWindowM || 12);
+    dashRenderTimesKPIs(resHours, filtered);
+    dashRenderTimesTrend(filtered, months);
+    dashRenderTimesHist(resHours);
+    dashRenderTimesAging(filtered.filter(i => i.status === "IN_PROGRESS"));
+    dashRenderTimesByService(filtered);
+    dashRenderTimesByComplexity(filtered);
+    dashRenderTimesByWeekday(closed);
+    dashRenderTimesBottleneck(filtered);
+    const main = document.getElementById("ttdb-times-main");
+    if (main) main.style.display = "flex";
+  }
+
+  function dashRenderTimesKPIs(resHours, filtered) {
+    const el = document.getElementById("ttdb-times-kpis");
+    if (!el) return;
+    const p50  = percentile(resHours, 50);
+    const avg  = resHours.length ? resHours.reduce((a,b)=>a+b,0)/resHours.length : null;
+    const p90  = percentile(resHours, 90);
+    const fast = resHours.filter(h => h <= 24).length;
+    const slow = resHours.filter(h => h > 168).length;
+    const pctFast = resHours.length ? Math.round(fast/resHours.length*100) : null;
+    const pctSlow = resHours.length ? Math.round(slow/resHours.length*100) : null;
+    const openOld = filtered.filter(i =>
+      i.status === "IN_PROGRESS" && i.initDate &&
+      (Date.now()-new Date(i.initDate))/3600000 > 168
+    ).length;
+    const skew = (avg && p50 && p50 > 0) ? avg/p50 : null;
+    el.innerHTML = `
+      <div class="ttdb-kcard ttdb-kc-grn">
+        <div class="ttdb-kl">Mediana p50${ttip("El 50% de las consultas cerradas se resuelve en este tiempo o menos. Métrica robusta frente a outliers — úsala como referencia principal de rendimiento.")}</div>
+        <div class="ttdb-kv" style="font-size:22px">${fmtHours(p50)}</div>
+        <div class="ttdb-ksub">${resHours.length} con fecha cierre</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-acc">
+        <div class="ttdb-kl">Promedio${ttip("Media aritmética de (endDate − initDate). Más sensible a outliers que la mediana. Si promedio >> p50, hay pocos casos muy lentos inflando la media.")}</div>
+        <div class="ttdb-kv" style="font-size:22px">${fmtHours(avg)}</div>
+        <div class="ttdb-ksub">${skew ? (skew > 1.8 ? "sesgado por lentas" : skew > 1.3 ? "cola larga" : "distribución uniforme") : "—"}</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-amb">
+        <div class="ttdb-kl">P90${ttip("El 90% de las consultas cerradas se resuelve en este tiempo o menos. Define el techo del rendimiento normal — lo que supera este umbral son los casos problemáticos que hay que investigar.")}</div>
+        <div class="ttdb-kv" style="font-size:22px">${fmtHours(p90)}</div>
+        <div class="ttdb-ksub">límite superior normal</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-grn" style="opacity:.9">
+        <div class="ttdb-kl">Rápidas ≤24h${ttip("% de consultas cerradas en 24 horas o menos. Consultas bien enrutadas desde el primer momento o de resolución directa con documentación.")}</div>
+        <div class="ttdb-kv" style="font-size:22px">${pctFast !== null ? pctFast+"%" : "—"}</div>
+        <div class="ttdb-ksub">${fast} cerradas en ≤1 día</div>
+      </div>
+      <div class="ttdb-kcard ttdb-kc-rose">
+        <div class="ttdb-kl">Lentas >7d${ttip("% de consultas cerradas que tardaron más de 7 días. Además hay ${openOld} actualmente abiertas con más de 7 días — son el backlog problemático que más coste genera.")}</div>
+        <div class="ttdb-kv" style="font-size:22px">${pctSlow !== null ? pctSlow+"%" : "—"}</div>
+        <div class="ttdb-ksub">${slow} cerradas · ${openOld} abiertas >7d</div>
+      </div>
+    `;
+  }
+
+  function dashRenderTimesTrend(items, months) {
+    const svg = document.getElementById("ttdb-times-trend");
+    if (!svg) return;
+    const byM = {};
+    months.forEach(m => { byM[m] = []; });
+    items.forEach(i => {
+      if (!i.endDate || !i.initDate) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      const m = i.initDate.slice(0,7);
+      if (byM[m] !== undefined) byM[m].push(h);
+    });
+    const mData = months.map(m => {
+      const hs = byM[m] || [];
+      return {
+        m,
+        avg: hs.length ? hs.reduce((a,b)=>a+b,0)/hs.length : null,
+        p50: percentile(hs, 50),
+        p90: percentile(hs, 90),
+        n:   hs.length,
+      };
+    });
+    const allVals = mData.flatMap(d => [d.avg, d.p50, d.p90]).filter(x => x !== null && isFinite(x));
+    if (!allVals.length) {
+      svg.innerHTML = `<text x="50%" y="60" text-anchor="middle" font-size="11" fill="#8a9bb0">Sin datos de resolución — consultas cerradas aún sin fecha de cierre</text>`;
+      return;
+    }
+    const maxVal = Math.max(...allVals) * 1.12 || 1;
+    const H=180, padT=18, padB=34, padL=44, padR=14, chartH=H-padT-padB;
+    const W = svg.parentElement ? (svg.parentElement.clientWidth||700) : 700;
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const n = months.length, step = (W-padL-padR)/n;
+    const mNames=["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    let out = "";
+    // Grid
+    [0,.25,.5,.75,1].forEach(t => {
+      const v = maxVal*t, y = padT + chartH - t*chartH;
+      out += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#dde3e8" stroke-width="1"/>`;
+      out += `<text x="${padL-4}" y="${y+3}" text-anchor="end" font-size="8" fill="#8a9bb0">${fmtHours(v)}</text>`;
+    });
+    // Month labels
+    months.forEach((m, i) => {
+      const cx = padL + i*step + step/2;
+      const mNum = parseInt(m.slice(5));
+      out += `<text x="${cx}" y="${H-17}" text-anchor="middle" font-size="8" fill="#8a9bb0">${mNames[mNum]}</text>`;
+      out += `<text x="${cx}" y="${H-5}" text-anchor="middle" font-size="7" fill="#c2cdd6">${m.slice(2,4)}</text>`;
+    });
+    // Area fill under p50
+    const p50coords = mData.map((d, i) => {
+      if (d.p50 === null) return null;
+      return [(padL + i*step + step/2).toFixed(1), (padT + chartH - (d.p50/maxVal)*chartH).toFixed(1)];
+    }).filter(Boolean);
+    if (p50coords.length >= 2) {
+      const bottom = (padT+chartH).toFixed(1);
+      const polyPts = p50coords.map(([x,y])=>`${x},${y}`).join(" ") +
+        ` ${p50coords[p50coords.length-1][0]},${bottom} ${p50coords[0][0]},${bottom}`;
+      out += `<polygon points="${polyPts}" fill="rgba(0,207,185,.08)"/>`;
+    }
+    // Draw line helper
+    const drawLine = (getter, color, sw, dash) => {
+      const pts = mData.map((d, i) => {
+        const v = getter(d);
+        if (v === null) return null;
+        return `${(padL + i*step + step/2).toFixed(1)},${(padT + chartH - (v/maxVal)*chartH).toFixed(1)}`;
+      }).filter(Boolean);
+      if (pts.length < 2) return "";
+      return `<polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:""}/>`;
+    };
+    out += drawLine(d=>d.p90, "#f4c53d", 1.5, "5 3");
+    out += drawLine(d=>d.avg, "#00C4E9", 1.5, "");
+    out += drawLine(d=>d.p50, "#00CFB9", 2.5, "");
+    // Dots + labels for p50
+    mData.forEach((d, i) => {
+      if (d.p50 === null || !d.n) return;
+      const cx = (padL + i*step + step/2).toFixed(1);
+      const cy = (padT + chartH - (d.p50/maxVal)*chartH).toFixed(1);
+      out += `<circle cx="${cx}" cy="${cy}" r="3" fill="#00CFB9" stroke="#fff" stroke-width="1.5"/>`;
+      out += `<text x="${cx}" y="${(parseFloat(cy)-6).toFixed(1)}" text-anchor="middle" font-size="7" font-weight="700" fill="#00CFB9">${fmtHours(d.p50)}</text>`;
+    });
+    svg.innerHTML = out;
+  }
+
+  function dashRenderTimesHist(resHours) {
+    const el = document.getElementById("ttdb-times-hist");
+    if (!el) return;
+    if (!resHours.length) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos de cierre</div>`;
+      return;
+    }
+    const buckets = [
+      { lbl:"< 2h",    max:2,        color:"#00CFB9" },
+      { lbl:"2–8h",    max:8,        color:"#00C4E9" },
+      { lbl:"8h–1d",   max:24,       color:"#30BBE2" },
+      { lbl:"1–3d",    max:72,       color:"#7c3aed" },
+      { lbl:"3–7d",    max:168,      color:"#a78bfa" },
+      { lbl:"7–14d",   max:336,      color:"#f4a53d" },
+      { lbl:"14–30d",  max:720,      color:"#e07b39" },
+      { lbl:"> 30d",   max:Infinity, color:"#e83e8c" },
+    ];
+    const counts = buckets.map(() => 0);
+    resHours.forEach(h => {
+      for (let b = 0; b < buckets.length; b++) {
+        if (h < buckets[b].max) { counts[b]++; break; }
+      }
+    });
+    const total = resHours.length, maxC = Math.max(...counts, 1);
+    el.innerHTML = buckets.map((b,i) =>
+      `<div class="ttdb-thist-row">
+        <div class="ttdb-thist-lbl">${b.lbl}</div>
+        <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
+        <div class="ttdb-thist-val">${counts[i]}</div>
+        <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
+      </div>`
+    ).join("");
+  }
+
+  function dashRenderTimesAging(openItems) {
+    const el = document.getElementById("ttdb-times-aging");
+    if (!el) return;
+    if (!openItems.length) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin consultas en curso</div>`;
+      return;
+    }
+    const now = Date.now();
+    const buckets = [
+      { lbl:"< 1d",    max:24,       color:"#00CFB9" },
+      { lbl:"1–3d",    max:72,       color:"#00C4E9" },
+      { lbl:"3–7d",    max:168,      color:"#7c3aed" },
+      { lbl:"7–14d",   max:336,      color:"#f4a53d" },
+      { lbl:"14–30d",  max:720,      color:"#e07b39" },
+      { lbl:"30–90d",  max:2160,     color:"#e83e8c" },
+      { lbl:"> 90d",   max:Infinity, color:"#991b1b" },
+    ];
+    const counts = buckets.map(() => 0);
+    openItems.forEach(i => {
+      if (!i.initDate) return;
+      const h = (now - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      for (let b = 0; b < buckets.length; b++) {
+        if (h < buckets[b].max) { counts[b]++; break; }
+      }
+    });
+    const total = openItems.length, maxC = Math.max(...counts, 1);
+    el.innerHTML = `<div style="font-size:10px;color:#8a9bb0;margin-bottom:6px"><b style="color:#2c3050">${total}</b> en curso ahora</div>` +
+      buckets.map((b,i) =>
+        `<div class="ttdb-thist-row">
+          <div class="ttdb-thist-lbl">${b.lbl}</div>
+          <div class="ttdb-thist-bar-wrap"><div class="ttdb-thist-bar-fill" style="width:${Math.round(counts[i]/maxC*100)}%;background:${b.color}"></div></div>
+          <div class="ttdb-thist-val">${counts[i]}</div>
+          <div class="ttdb-thist-pct">${pctN(counts[i],total)}%</div>
+        </div>`
+      ).join("");
+  }
+
+  function dashRenderTimesByService(items) {
+    const el = document.getElementById("ttdb-times-service");
+    if (!el) return;
+    const svcH = {};
+    items.forEach(i => {
+      if (!i.endDate || !i.initDate) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      const s = i.resolverService || "Sin servicio";
+      if (!svcH[s]) svcH[s] = [];
+      svcH[s].push(h);
+    });
+    const rows = Object.entries(svcH)
+      .filter(([,hs]) => hs.length >= 2)
+      .map(([s,hs]) => ({
+        s, n: hs.length,
+        p50: percentile(hs, 50),
+        avg: hs.reduce((a,b)=>a+b,0)/hs.length,
+        p90: percentile(hs, 90),
+      }))
+      .sort((a,b) => a.p50 - b.p50);
+    if (!rows.length) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos (mínimo 2 consultas cerradas por servicio)</div>`;
+      return;
+    }
+    const maxP90 = Math.max(...rows.map(r => r.p90), 1);
+    const colorFor = h => h < 24 ? "#00CFB9" : h < 120 ? "#00C4E9" : h < 360 ? "#f4a53d" : "#e83e8c";
+    el.innerHTML = rows.map(r => {
+      const p50w = Math.round(r.p50/maxP90*100);
+      const avgw = Math.round(r.avg/maxP90*100);
+      const p90w = Math.round(r.p90/maxP90*100);
+      const c    = colorFor(r.p50);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:10px">
+        <div style="flex:0 0 150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2c3050" title="${r.s}">${r.s}</div>
+        <div style="flex:1;position:relative;height:14px;min-width:60px">
+          <div style="position:absolute;inset:3px 0;background:#edf0f3;border-radius:4px;width:${p90w}%"></div>
+          <div style="position:absolute;inset:3px 0;background:rgba(0,196,233,.35);border-radius:4px;width:${avgw}%"></div>
+          <div style="position:absolute;inset:3px 0;background:${c};border-radius:4px;width:${p50w}%"></div>
+        </div>
+        <div style="flex:0 0 38px;text-align:right;font-weight:700;color:${c}">${fmtHours(r.p50)}</div>
+        <div style="flex:0 0 54px;text-align:right;font-size:9px;color:#8a9bb0">p90:${fmtHours(r.p90)}</div>
+        <div style="flex:0 0 22px;text-align:right;font-size:9px;color:#c2cdd6">${r.n}×</div>
+      </div>`;
+    }).join("") +
+    `<div style="font-size:9px;color:#c2cdd6;margin-top:6px">■ p50 &nbsp; ░ promedio &nbsp; □ p90 &nbsp;·&nbsp; Ordenado de más rápido (arriba) a más lento</div>`;
+  }
+
+  function dashRenderTimesByComplexity(items) {
+    const el = document.getElementById("ttdb-times-cplx");
+    if (!el) return;
+    const lvls = [
+      { key:"LOW",    label:"Baja",  color:"#00CFB9" },
+      { key:"MEDIUM", label:"Media", color:"#f4c53d" },
+      { key:"HIGH",   label:"Alta",  color:"#e83e8c" },
+    ];
+    const byLvl = {};
+    lvls.forEach(l => { byLvl[l.key] = []; });
+    items.forEach(i => {
+      if (!i.endDate || !i.initDate || !i.complexity) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      if (byLvl[i.complexity]) byLvl[i.complexity].push(h);
+    });
+    const hasData = lvls.some(l => byLvl[l.key].length > 0);
+    if (!hasData) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos de complejidad (solo disponible en consultas cerradas)</div>`;
+      return;
+    }
+    const globalMax = Math.max(...Object.values(byLvl).flatMap(x=>x), 1);
+    el.innerHTML = lvls.map(({key,label,color}) => {
+      const hs = byLvl[key];
+      if (!hs.length) return `<div style="margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:${color};margin-bottom:4px">${label} <span style="font-weight:400;color:#8a9bb0">(0)</span></div>
+        <div style="color:#c2cdd6;font-size:9px;font-style:italic">Sin datos</div>
+      </div>`;
+      const p50 = percentile(hs, 50);
+      const avg = hs.reduce((a,b)=>a+b,0)/hs.length;
+      const p90 = percentile(hs, 90);
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <div style="font-size:10px;font-weight:700;color:${color}">${label} <span style="font-weight:400;color:#8a9bb0">(${hs.length})</span></div>
+          <div style="display:flex;gap:10px;font-size:9px;color:#8a9bb0">
+            <span>p50 <b style="color:#2c3050">${fmtHours(p50)}</b></span>
+            <span>avg <b style="color:#2c3050">${fmtHours(avg)}</b></span>
+            <span>p90 <b style="color:#2c3050">${fmtHours(p90)}</b></span>
+          </div>
+        </div>
+        <div style="position:relative;height:10px;background:#edf0f3;border-radius:5px;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;width:${Math.round(p90/globalMax*100)}%;height:100%;background:${color};opacity:.12"></div>
+          <div style="position:absolute;left:0;top:0;width:${Math.round(avg/globalMax*100)}%;height:100%;background:${color};opacity:.4"></div>
+          <div style="position:absolute;left:0;top:0;width:${Math.round(p50/globalMax*100)}%;height:100%;background:${color};border-radius:5px"></div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function dashRenderTimesByWeekday(closed) {
+    const el = document.getElementById("ttdb-times-weekday");
+    if (!el) return;
+    const DAY = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+    const byDay = Array.from({length:7}, ()=>[]);
+    closed.forEach(i => {
+      if (!i.initDate || !i.endDate) return;
+      const h = (new Date(i.endDate) - new Date(i.initDate)) / 3600000;
+      if (!isFinite(h) || h < 0) return;
+      byDay[new Date(i.initDate).getDay()].push(h);
+    });
+    const avgs = byDay.map(hs => hs.length >= 2 ? hs.reduce((a,b)=>a+b,0)/hs.length : null);
+    const maxA = Math.max(...avgs.filter(x=>x!==null), 1);
+    if (!avgs.some(x=>x!==null)) {
+      el.innerHTML = `<div style="color:#8a9bb0;font-size:11px;padding:8px 0">Sin datos</div>`;
+      return;
+    }
+    const H=90, padT=10, padB=22, padL=6, padR=6, chartH=H-padT-padB;
+    const W = 240;
+    const step=(W-padL-padR)/7, barW=Math.max(step-4,8);
+    const colorFor = h => h===null?"#edf0f3":h<24?"#00CFB9":h<120?"#00C4E9":h<360?"#f4a53d":"#e83e8c";
+    let out = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block">`;
+    DAY.forEach((name, d) => {
+      const v   = avgs[d];
+      const x   = padL + d*step + (step-barW)/2;
+      const bH  = v !== null ? (v/maxA)*chartH : 0;
+      const isWknd = d===0||d===6;
+      const col = colorFor(v);
+      if (bH>0) out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-bH).toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" rx="2" opacity="${isWknd?0.55:1}"/>`;
+      else       out += `<rect x="${x.toFixed(1)}" y="${(padT+chartH-2).toFixed(1)}" width="${barW.toFixed(1)}" height="2" fill="#edf0f3" rx="1"/>`;
+      out += `<text x="${(x+barW/2).toFixed(1)}" y="${H-7}" text-anchor="middle" font-size="8" fill="${isWknd?"#c2cdd6":"#8a9bb0"}">${name}</text>`;
+      if (v !== null) out += `<text x="${(x+barW/2).toFixed(1)}" y="${(padT+chartH-bH-3).toFixed(1)}" text-anchor="middle" font-size="7" fill="${col}">${fmtHours(v)}</text>`;
+    });
+    out += `</svg><div style="font-size:9px;color:#c2cdd6;margin-top:3px">T. medio de resolución según día de apertura · mín. 2 datos por día</div>`;
+    el.innerHTML = out;
+  }
+
+  function dashRenderTimesBottleneck(items) {
+    const el = document.getElementById("ttdb-times-bottleneck");
+    if (!el) return;
+    const now = Date.now();
+    const THRESH_H = 168;
+    const slowClosed = items.filter(i => i.endDate && i.initDate &&
+      (new Date(i.endDate) - new Date(i.initDate)) / 3600000 > THRESH_H);
+    const slowOpen = items.filter(i => !i.endDate && i.initDate &&
+      (now - new Date(i.initDate)) / 3600000 > THRESH_H);
+    const slow = [...slowClosed, ...slowOpen];
+    if (!slow.length) {
+      el.innerHTML = `<div style="text-align:center;padding:14px;color:#00CFB9;font-size:12px">✓ Ninguna consulta supera los 7 días en el periodo seleccionado</div>`;
+      return;
+    }
+    const totalSlow = slow.length;
+    // By service
+    const bySvc = {};
+    slow.forEach(i => { const s = i.resolverService||"Sin servicio"; bySvc[s]=(bySvc[s]||0)+1; });
+    const topSvc = Object.entries(bySvc).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    // By complexity
+    const byCplx = {};
+    slow.forEach(i => { const k = i.complexity||"Sin datos"; byCplx[k]=(byCplx[k]||0)+1; });
+    const cplxOrder = [["LOW","Baja","#00CFB9"],["MEDIUM","Media","#f4a53d"],["HIGH","Alta","#e83e8c"],["Sin datos","Sin datos","#c2cdd6"]];
+    // By PPM
+    const byPPM = {};
+    slow.forEach(i => { const p = i.ppm||"Sin PPM"; byPPM[p]=(byPPM[p]||0)+1; });
+    const topPPM = Object.entries(byPPM).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const svcCols = ["#e83e8c","#f4a53d","#7c3aed","#00C4E9","#00CFB9","#c2cdd6"];
+    el.innerHTML = `
+      <div style="font-size:10px;color:#8a9bb0;margin-bottom:12px">
+        <b style="color:#e83e8c;font-size:14px">${totalSlow}</b> consultas con más de 7 días &nbsp;·&nbsp;
+        ${slowClosed.length} cerradas lentamente &nbsp;·&nbsp;
+        <b style="color:#e83e8c">${slowOpen.length}</b> aún abiertas
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px">
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8a9bb0;margin-bottom:8px">Por servicio</div>
+          ${topSvc.map(([s,c],i)=>`
+            <div class="ttdb-type-row">
+              <div class="ttdb-type-name" title="${s}">${s}</div>
+              <div class="ttdb-type-bar-wrap" style="width:70px"><div class="ttdb-type-bar-fill" style="width:${Math.round(c/topSvc[0][1]*100)}%;background:${svcCols[i%svcCols.length]}"></div></div>
+              <div class="ttdb-type-count">${c}</div>
+              <div style="width:28px;text-align:right;font-size:9px;color:#8a9bb0">${Math.round(c/totalSlow*100)}%</div>
+            </div>`).join("")}
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8a9bb0;margin-bottom:8px">Por complejidad</div>
+          ${cplxOrder.filter(([k])=>byCplx[k]).map(([k,label,color])=>{const c=byCplx[k]||0;return`
+            <div class="ttdb-type-row">
+              <div class="ttdb-type-name" style="min-width:70px;max-width:70px">${label}</div>
+              <div class="ttdb-type-bar-wrap" style="width:70px"><div class="ttdb-type-bar-fill" style="width:${Math.round(c/totalSlow*100)}%;background:${color}"></div></div>
+              <div class="ttdb-type-count">${c}</div>
+              <div style="width:28px;text-align:right;font-size:9px;color:#8a9bb0">${Math.round(c/totalSlow*100)}%</div>
+            </div>`;}).join("")}
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#8a9bb0;margin-bottom:8px">Por PPM</div>
+          ${topPPM.map(([p,c])=>`
+            <div class="ttdb-type-row">
+              <div class="ttdb-type-name" style="min-width:70px;max-width:70px">${p}</div>
+              <div class="ttdb-type-bar-wrap" style="width:70px"><div class="ttdb-type-bar-fill" style="width:${Math.round(c/topPPM[0][1]*100)}%;background:#7c3aed"></div></div>
+              <div class="ttdb-type-count">${c}</div>
+              <div style="width:28px;text-align:right;font-size:9px;color:#8a9bb0">${Math.round(c/totalSlow*100)}%</div>
+            </div>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   // ── Network / API Explorer ─────────────────────────────────────────
   function renderNetExplorer() {
     const el = document.getElementById("ttdb-net-list");
@@ -2186,10 +2694,11 @@
     el.classList.add("active");
     const main   = document.getElementById("ttdb-main");
     const cmain  = document.getElementById("ttdb-cons-main");
+    const tmain  = document.getElementById("ttdb-times-main");
     const nmain  = document.getElementById("ttdb-net-main");
     const svcHdr = document.getElementById("ttdb-hdr-svc");
-    [main,cmain,nmain].forEach(e => { if(e) e.style.display="none"; });
-    if (svcHdr) svcHdr.style.display = tab === "cons" ? "flex" : "none";
+    [main,cmain,tmain,nmain].forEach(e => { if(e) e.style.display="none"; });
+    if (svcHdr) svcHdr.style.display = (tab === "cons" || tab === "times") ? "flex" : "none";
     if (tab === "vol") {
       if (main) main.style.display = "";
     } else if (tab === "cons") {
@@ -2200,6 +2709,12 @@
       } else {
         // Still loading in background — show loading spinner; render fires when done
         dashSetLoading(true, "Cargando consultas…", 0);
+      }
+    } else if (tab === "times") {
+      if (state.dash.cons.loaded) {
+        renderTiempos();  // sets display:flex internally
+      } else {
+        dashSetLoading(true, "Cargando datos de tiempos…", 0);
       }
     } else if (tab === "net") {
       if (nmain) nmain.style.display = "flex";
@@ -2221,14 +2736,19 @@
 
   window.__teamerToolkit._dashSvcFilter = (svc) => {
     state.dash.cons.serviceFilter = svc;
-    renderConsultas();
-    setTimeout(() => {
-      const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
-      const f = state.dash.cons.items.filter(i => {
-        return new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc);
-      });
-      dashRenderConsultasBar(f, dashBuildMonths(state.dash.cons.windowM));
-    }, 50);
+    const tmain = document.getElementById("ttdb-times-main");
+    if (tmain && tmain.style.display !== "none") {
+      renderTiempos();
+    } else {
+      renderConsultas();
+      setTimeout(() => {
+        const cutoff = new Date(); cutoff.setFullYear(cutoff.getFullYear()-1);
+        const f = state.dash.cons.items.filter(i =>
+          new Date(i.initDate) >= cutoff && (svc==="all" || i.resolverService===svc)
+        );
+        dashRenderConsultasBar(f, dashBuildMonths(state.dash.cons.windowM));
+      }, 50);
+    }
   };
 
   window.__teamerToolkit._dashSvcFilterClick = (svc) => {
@@ -2252,6 +2772,12 @@
     dashRenderOpenClose(f, months);
     dashRenderConsultasBar(f, months);
     dashRenderFeedbackTrend(f, months);
+  };
+  window.__teamerToolkit._dashTimesWindow = (n, el) => {
+    el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    state.dash.timesWindowM = n;
+    renderTiempos();
   };
   window.__teamerToolkit._dashWindow     = (n, el) => {
     el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t=>t.classList.remove("active"));

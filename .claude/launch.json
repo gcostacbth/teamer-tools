@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "teamer-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "7821", "--directory", "/Users/rosamaria/caixa/teamer-tools"],
+      "port": 7821
+    }
+  ]
+}

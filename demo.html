@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teamer Toolkit · Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #e8ecf0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Fake portal chrome */
+    #TeamerHeader {
+      position: fixed; top: 0; left: 0; right: 0; height: 48px;
+      background: #000026; display: flex; align-items: center; padding: 0 20px;
+      z-index: 1; gap: 12px;
+    }
+    #TeamerHeader span { color: #fff; font-size: 13px; font-weight: 600; }
+    .portal-content {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh;
+      color: #8a9bb0; font-size: 13px; letter-spacing: .5px;
+    }
+    /* Hide the mini floating panel — we only want the full overlay */
+    #tt-panel { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="TeamerHeader">
+    <span>CaixaBank · Portal Interno</span>
+    <span style="opacity:.4">|</span>
+    <span style="opacity:.6; font-weight:400">Demo — Teamer Toolkit</span>
+  </div>
+  <div class="portal-content">Portal simulado · El dashboard se abrirá automáticamente</div>
+
+  <script src="teamer.js"></script>
+  <script>
+    // Auto-open dashboard in demo mode once the IIFE has run
+    setTimeout(() => {
+      const btn = document.getElementById("tt-dashboard-btn");
+      if (btn) {
+        btn.click();                          // opens the overlay
+        setTimeout(() => {
+          if (window.__teamerToolkit?._dashDemo) {
+            window.__teamerToolkit._dashDemo(); // loads demo data
+          }
+        }, 80);
+      }
+    }, 60);
+  </script>
+</body>
+</html>
