@@ -311,9 +311,31 @@
   // ==================================================================
 
   const DB_STYLE = `
-  @keyframes ttdb-open{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
-  #tt-dashboard{position:fixed;inset:0;z-index:2147483640;background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif;color:#000026;overflow-y:auto;display:flex;flex-direction:column;animation:ttdb-open .28s cubic-bezier(.22,.68,0,1.15) both}
-  .ttdb-header{background:#fff;border-bottom:2px solid #dde3e8;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex-shrink:0}
+  @keyframes ttdb-open{
+    0%   { opacity:0; transform:translateY(-28px) scale(.94); filter:blur(4px); }
+    65%  { transform:translateY(4px) scale(1.005); filter:blur(0); }
+    100% { opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
+  }
+  #tt-dashboard{position:fixed;inset:0;z-index:2147483640;background:#f0f2f5;font-family:'Segoe UI',system-ui,sans-serif;color:#000026;overflow-y:auto;display:flex;flex-direction:column;animation:ttdb-open .42s cubic-bezier(.22,.68,0,1.15) both}
+
+  @keyframes ttdb-hdr-shine{
+    0%   { transform:translateX(-120%) skewX(-18deg); opacity:1; }
+    100% { transform:translateX(700%)  skewX(-18deg); opacity:0; }
+  }
+  .ttdb-header{background:#fff;border-bottom:2px solid #dde3e8;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex-shrink:0;position:relative;overflow:hidden}
+  .ttdb-header::after{content:'';position:absolute;top:0;left:0;width:28%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,196,233,.18),rgba(124,58,237,.08),transparent);animation:ttdb-hdr-shine .75s .15s ease-out both;pointer-events:none}
+
+  @keyframes ttdb-card-in{
+    from{ opacity:0; transform:translateY(14px) scale(.96); }
+    to  { opacity:1; transform:translateY(0)    scale(1);   }
+  }
+  .ttdb-kcard{ animation:ttdb-card-in .32s cubic-bezier(.22,.68,0,1.15) both; }
+  .ttdb-kcard:nth-child(1){ animation-delay:.05s; }
+  .ttdb-kcard:nth-child(2){ animation-delay:.09s; }
+  .ttdb-kcard:nth-child(3){ animation-delay:.13s; }
+  .ttdb-kcard:nth-child(4){ animation-delay:.17s; }
+  .ttdb-kcard:nth-child(5){ animation-delay:.21s; }
+  .ttdb-kcard:nth-child(6){ animation-delay:.25s; }
   .ttdb-title{font-size:17px;font-weight:800;letter-spacing:-.5px}
   .ttdb-sub{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#8a9bb0;margin-top:1px}
   .ttdb-pill{font-size:9px;padding:3px 9px;border-radius:20px;font-weight:700;background:rgba(0,196,233,.12);color:#00C4E9;border:1px solid rgba(0,196,233,.25)}
@@ -3082,13 +3104,36 @@
   // ==================================================================
 
   function createPanel() {
+    // Panel entrance + button pulse keyframes (scoped to avoid conflicts)
+    if (!document.getElementById("tt-panel-style")) {
+      const ps = document.createElement("style");
+      ps.id = "tt-panel-style";
+      ps.textContent = `
+        @keyframes tt-panel-in{
+          0%  { opacity:0; transform:translateY(36px) scale(.86); }
+          72% { transform:translateY(-7px) scale(1.03); }
+          100%{ opacity:1; transform:translateY(0) scale(1); }
+        }
+        @keyframes tt-btn-glow{
+          0%,100%{ box-shadow:0 0 0 0 rgba(124,58,237,.7); }
+          50%    { box-shadow:0 0 0 8px rgba(124,58,237,0); }
+        }
+        @keyframes tt-btn-shimmer{
+          from{ background-position:-200% 0; }
+          to  { background-position:200% 0; }
+        }
+      `;
+      document.head.appendChild(ps);
+    }
+
     const panel = document.createElement("div");
     panel.id = "tt-panel";
     panel.style.cssText = [
       "position:fixed","bottom:10px","right:10px","width:380px","max-height:65vh",
       "background:#1f1f1f","color:#fff","padding:10px","border-radius:10px",
       "z-index:999999","font:12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial",
-      "box-shadow:0 8px 30px rgba(0,0,0,.35)"
+      "box-shadow:0 8px 30px rgba(0,0,0,.35)",
+      "animation:tt-panel-in .5s cubic-bezier(.22,.68,0,1.15) both"
     ].join(";");
 
     panel.innerHTML = `
@@ -3107,7 +3152,7 @@
         <button id="tt-copy"      style="cursor:pointer;border:0;border-radius:8px;padding:6px;font-size:10px">Copy user</button>
         <button id="tt-export"    style="cursor:pointer;border:0;border-radius:8px;padding:6px;font-size:10px;background:#00C4E9;color:#000;font-weight:700">⬇ Export</button>
         <button id="tt-clear"     style="cursor:pointer;border:0;border-radius:8px;padding:6px;font-size:10px">Clear</button>
-        <button id="tt-dashboard-btn" style="cursor:pointer;border:0;border-radius:8px;padding:6px;font-size:10px;background:#7c3aed;color:#fff;font-weight:700">📊 Vol.</button>
+        <button id="tt-dashboard-btn" style="cursor:pointer;border:0;border-radius:8px;padding:6px;font-size:10px;background:linear-gradient(90deg,#7c3aed,#00C4E9,#7c3aed);background-size:200% 100%;color:#fff;font-weight:700;animation:tt-btn-glow .9s .6s 3 ease-out,tt-btn-shimmer 2s .3s 2 ease-in-out both">📊 Vol.</button>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <input id="tt-endpoint" placeholder="/ruta/api o URL completa"
