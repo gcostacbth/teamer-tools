@@ -815,7 +815,7 @@
     // ── Global tooltip box (position:fixed escapes all overflow:hidden parents) ──
     const _tb = document.createElement("div");
     _tb.id = "ttdb-tip-box";
-    _tb.style.cssText = "display:none;position:fixed;z-index:2147483647;background:#000026;color:#fff;font-size:10px;font-weight:400;line-height:1.6;padding:8px 12px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:260px;white-space:normal;pointer-events:none;letter-spacing:0;text-transform:none;font-family:'Segoe UI',system-ui,sans-serif";
+    _tb.style.cssText = "display:none;position:fixed;z-index:2147483647;background:#000026;color:#fff;font-size:10px;font-weight:400;line-height:1.6;padding:8px 12px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:300px;white-space:normal;pointer-events:none;letter-spacing:0;text-transform:none;font-family:'Segoe UI',system-ui,sans-serif";
     document.body.appendChild(_tb);
 
     function _posTip(anchor) {
@@ -1593,7 +1593,7 @@
 
     // Backlog actual (IN_PROGRESS only)
     const openItems = filtered.filter(i => i.status === "IN_PROGRESS");
-    dashRenderBacklogKPIs(openItems);
+    dashRenderBacklogKPIs(openItems, filtered);
     dashRenderBacklogAge(openItems);
     dashRenderBacklogBySvc(openItems);
     dashRenderBacklogTop(openItems);
@@ -1603,7 +1603,7 @@
   }
 
   // ── Backlog section ─────────────────────────────────────────────────
-  function dashRenderBacklogKPIs(openItems) {
+  function dashRenderBacklogKPIs(openItems, allItems) {
     const el = document.getElementById("ttdb-backlog-kpis");
     if (!el) return;
     const now = Date.now();
@@ -1613,6 +1613,56 @@
     const median = ages.length ? percentile(ages, 50) : null;
     const gt7d   = ages.filter(h => h > 168).length;
     const gt30d  = ages.filter(h => h > 720).length;
+
+    // ── Estimación de cierre con media ponderada exponencial ──
+    // Usamos las consultas cerradas del historial (con endDate) para calcular
+    // la tasa de cierre semanal dando más peso a las semanas recientes.
+    const HIST_WEEKS = 12;
+    const MS_WEEK    = 7 * 24 * 3600 * 1000;
+    const closedHist = (allItems || []).filter(i => i.endDate && i.status !== "IN_PROGRESS");
+    // weekCounts[w] = cierres hace w semanas (0 = semana actual, 1 = semana pasada, ...)
+    const weekCounts = Array(HIST_WEEKS).fill(0);
+    closedHist.forEach(i => {
+      const w = Math.floor((now - new Date(i.endDate).getTime()) / MS_WEEK);
+      if (w >= 0 && w < HIST_WEEKS) weekCounts[w]++;
+    });
+    // Peso exponencial: w=0 (más reciente) → peso 1.0, cada semana atrás → ×0.5 (vida media = 2 sem)
+    let wSum = 0, wTotal = 0;
+    weekCounts.forEach((cnt, w) => {
+      const weight = Math.pow(2, -w / 2); // semivida de 2 semanas
+      wSum   += weight * cnt;
+      wTotal += weight;
+    });
+    const weightedRate = wTotal > 0 ? wSum / wTotal : 0; // tickets cerrados/semana (ponderado)
+    const etaWeeks     = weightedRate > 0.01 ? total / weightedRate : null;
+    const etaDate      = etaWeeks !== null
+      ? new Date(now + etaWeeks * MS_WEEK).toLocaleDateString("es-ES", { day:"numeric", month:"short", year:"numeric" })
+      : null;
+    const etaLabel     = etaWeeks !== null
+      ? (etaWeeks < 1 ? "< 1 semana" : etaWeeks < 2 ? "~1 semana" : `~${Math.round(etaWeeks)} semanas`)
+      : "—";
+    const rateLabel    = weightedRate > 0 ? `${weightedRate.toFixed(1)} cierres/sem` : "sin datos";
+    const etaColor     = etaWeeks === null ? "" : etaWeeks > 8 ? "ttdb-kcard-red" : etaWeeks > 4 ? "ttdb-kc-amb" : "ttdb-kc-grn";
+
+    // Build tooltip: formula explanation + per-week breakdown (HTML, rendered via innerHTML)
+    const weekRowsHtml = weekCounts.slice(0, 8).map((cnt, w) => {
+      const weight = Math.pow(2, -w / 2);
+      const label  = w === 0 ? "Esta sem" : `Sem -${w}`;
+      return `<span style="color:#8a9bb0">${label}</span> ${cnt} cierres · peso <b>${weight.toFixed(2)}</b>`;
+    }).join("<br>");
+    const etaTip = ttip(
+      `<b>Estimación de cierre del backlog</b><br>` +
+      `<span style="color:#8a9bb0">Fórmula:</span> Backlog ÷ tasa ponderada<br><br>` +
+      `<b>Tasa ponderada</b> = Σ(peso_w × cierres_w) / Σ(peso_w)<br>` +
+      `peso_w = 2^(−w/2) · semivida 2 semanas<br>` +
+      `→ semana actual vale 2× más que la de hace 2 sem,<br>4× más que hace 4 sem, etc.<br><br>` +
+      `<b>Últimas ${HIST_WEEKS} semanas (endDate):</b><br>` +
+      weekRowsHtml +
+      `<br><br>` +
+      `Tasa actual: <b>${rateLabel}</b><br>` +
+      `ETA: ${total} ÷ ${weightedRate.toFixed(2)} = <b>${etaWeeks !== null ? etaWeeks.toFixed(1) : "∞"} semanas</b>`
+    );
+
     if (!total) {
       el.innerHTML = `<div style="color:#00CFB9;font-size:12px;padding:8px 0">✓ No hay consultas abiertas en el periodo seleccionado</div>`;
       return;
@@ -1637,6 +1687,11 @@
         <div class="ttdb-kl">Más de 30 días${ttip("Consultas con más de 30 días de antigüedad sin cerrarse. Cualquier valor > 0 requiere atención inmediata.")}</div>
         <div class="ttdb-kv">${fmtN(gt30d)}</div>
         <div class="ttdb-ksub">más antigua: ${fmtHours(oldest)}</div>
+      </div>
+      <div class="ttdb-kcard ${etaColor}">
+        <div class="ttdb-kl">Estimación de cierre${etaTip}</div>
+        <div class="ttdb-kv" style="font-size:${etaDate ? "12px" : "22px"}">${etaDate || etaLabel}</div>
+        <div class="ttdb-ksub">${etaDate ? etaLabel + " · " + rateLabel : rateLabel}</div>
       </div>
     `;
   }
