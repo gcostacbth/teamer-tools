@@ -740,6 +740,23 @@
             <div id="ttdb-imp-cplx"></div>
           </div>
         </div>
+
+        <div class="ttdb-section-title">📦 Peticiones · Volumen por tipología</div>
+        <div class="ttdb-card">
+          <div class="ttdb-card-title">
+            <span>Tipologías de petición</span>${ttip("Volumen de peticiones agrupado por requestTypeDescription (sin prefijo [ID]). Incluye todos los tipos del periodo (últimos 12 meses). Fuente: GET /devops/bis/1/my-processes — procesos con categoryDescription ≠ Consultas.<br><br>Barra apilada: azul = en curso · verde = completado · ámbar = cancelado/expirado.<br>Trend: ↑/↓ = % de cambio del mes actual vs mes anterior.")}
+            <div class="ttdb-tabs">
+              <div class="ttdb-tab active" onclick="window.__teamerToolkit._dashPetSort('vol',this)">Volumen</div>
+              <div class="ttdb-tab" onclick="window.__teamerToolkit._dashPetSort('open',this)">Pendientes</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:9px;color:#8a9bb0">
+            <span><span style="display:inline-block;width:10px;height:10px;background:#00C4E9;border-radius:2px;margin-right:3px;vertical-align:middle"></span>En curso</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#00CFB9;border-radius:2px;margin-right:3px;vertical-align:middle"></span>Completado</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:#f4a53d;border-radius:2px;margin-right:3px;vertical-align:middle;opacity:.8"></span>Cancelado / Expirado</span>
+          </div>
+          <div id="ttdb-pet-tipos"></div>
+        </div>
       </div>
 
       <div class="ttdb-times-main" id="ttdb-times-main" style="display:none">
@@ -863,6 +880,7 @@
     state.dash.overlay    = ov;
     state.dash.windowM    = 12;
     state.dash.typeFilter = "all";
+    state.dash.petSort    = "vol";
     state.dash.items      = [];
     state.dash.cons        = { items:[], serviceFilter:"all", windowM:12, loaded:false, cancel:false };
     state.dash.timesWindowM = 12;
@@ -1598,6 +1616,9 @@
     dashRenderBacklogBySvc(openItems);
     dashRenderBacklogTop(openItems);
 
+    // Peticiones por tipología (uses state.dash.items — process data)
+    dashRenderPeticionesTipologia();
+
     const main = document.getElementById("ttdb-cons-main");
     if (main) main.style.display = "flex";
   }
@@ -2278,6 +2299,92 @@
         <div class="ttdb-type-bar-wrap" style="width:90px"><div class="ttdb-type-bar-fill" style="width:${pct}%;background:${color}"></div></div>
         <div class="ttdb-type-count">${fmtN(v.total)}</div>
         <div style="width:30px;text-align:right;font-size:9px;color:${impPct>20?"#e83e8c":"#8a9bb0"};flex-shrink:0">${impPct}%↯</div>
+      </div>`;
+    }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
+  }
+
+  // ── Peticiones por tipología ─────────────────────────────────────
+  function dashRenderPeticionesTipologia() {
+    const el = document.getElementById("ttdb-pet-tipos");
+    if (!el) return;
+
+    // All processes from last 12 months, non-consultas only
+    const months12  = dashBuildMonths(12);
+    const peticiones = state.dash.items.filter(i => months12.includes(i.month) && !isConsulta(i));
+
+    if (!peticiones.length) {
+      el.innerHTML = `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos de peticiones — carga los datos del dashboard primero</div>`;
+      return;
+    }
+
+    const now        = new Date();
+    const curMonth   = now.toISOString().slice(0, 7);
+    const prevDate   = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth  = prevDate.toISOString().slice(0, 7);
+    const prev2Date  = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const prev2Month = prev2Date.toISOString().slice(0, 7);
+
+    // Build per-type stats
+    const map = {};
+    for (const i of peticiones) {
+      const t = (i.typeDesc || "").replace(/^\[\d+\]\s*/, "").trim() || "(Sin tipología)";
+      if (!map[t]) map[t] = { total:0, open:0, completed:0, other:0, curM:0, prevM:0, prev2M:0 };
+      map[t].total++;
+      const st = (i.status || "").toLowerCase();
+      if      (st === "inprogress") map[t].open++;
+      else if (st === "completed")  map[t].completed++;
+      else                          map[t].other++;
+      if (i.month === curMonth)  map[t].curM++;
+      if (i.month === prevMonth) map[t].prevM++;
+      if (i.month === prev2Month) map[t].prev2M++;
+    }
+
+    const sortBy = state.dash.petSort || 'vol';
+    let rows = Object.entries(map).map(([type, v]) => ({ type, ...v }));
+    if (sortBy === 'open') rows.sort((a, b) => b.open - a.open || b.total - a.total);
+    else                   rows.sort((a, b) => b.total - a.total);
+
+    const maxTotal = rows[0]?.total || 1;
+    const BAR_MAX  = 200; // px for the widest bar
+
+    el.innerHTML = rows.map(r => {
+      const barW = Math.round(r.total / maxTotal * BAR_MAX);
+
+      // Stacked bar px widths (Bresenham-style, no rounding overflow)
+      const openPx  = Math.round(r.open      / r.total * barW);
+      const donePx  = Math.round(r.completed / r.total * barW);
+      const othPx   = barW - openPx - donePx; // remainder goes to other
+
+      // Summary percentages
+      const openPct = r.total ? Math.round(r.open      / r.total * 100) : 0;
+      const donePct = r.total ? Math.round(r.completed / r.total * 100) : 0;
+
+      // MoM trend: compare curMonth vs prevMonth (fall back to prev2 if curMonth is very early)
+      const base  = r.prevM > 0 ? r.prevM : r.prev2M;
+      const comp  = r.prevM > 0 ? r.curM  : r.prevM;
+      let trendHtml = `<div style="width:40px;flex-shrink:0"></div>`;
+      if (base > 0) {
+        const delta    = comp - base;
+        const deltaPct = Math.round(Math.abs(delta) / base * 100);
+        const tColor   = delta > 5 ? "#e83e8c" : delta < -5 ? "#00CFB9" : "#8a9bb0";
+        const tArrow   = delta > 5 ? "↑" : delta < -5 ? "↓" : "→";
+        trendHtml = `<div style="width:40px;flex-shrink:0;text-align:right;font-size:9px;color:${tColor}" title="MoM: ${comp} este mes vs ${base} mes anterior">${tArrow}${deltaPct}%</div>`;
+      }
+
+      const openColor = openPct > 40 ? "#e83e8c" : openPct > 20 ? "#f4a53d" : "#8a9bb0";
+      const typeHtml  = r.type.replace(/</g,"&lt;").replace(/"/g,"&quot;");
+
+      return `<div class="ttdb-type-row" title="${typeHtml}">
+        <div class="ttdb-type-name" style="min-width:190px;max-width:190px">${typeHtml}</div>
+        <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;width:${BAR_MAX}px;flex-shrink:0;background:#edf0f3">
+          ${openPx > 0  ? `<div style="width:${openPx}px;height:100%;background:#00C4E9"></div>` : ""}
+          ${donePx > 0  ? `<div style="width:${donePx}px;height:100%;background:#00CFB9"></div>` : ""}
+          ${othPx  > 0  ? `<div style="width:${othPx}px;height:100%;background:#f4a53d;opacity:.75"></div>` : ""}
+        </div>
+        <div class="ttdb-type-count" style="width:42px">${fmtN(r.total)}</div>
+        <div style="width:48px;flex-shrink:0;text-align:right;font-size:9px;color:${openColor}">${r.open} abiertos</div>
+        <div style="width:36px;flex-shrink:0;text-align:right;font-size:9px;color:#00CFB9">${donePct}%✓</div>
+        ${trendHtml}
       </div>`;
     }).join("") || `<div style="text-align:center;padding:16px;color:#8a9bb0;font-size:11px">Sin datos</div>`;
   }
@@ -3147,6 +3254,13 @@
     dashRenderTypes(state.dash.items.filter(i=>months.includes(i.month)));
   };
 
+  window.__teamerToolkit._dashPetSort = (sortBy, el) => {
+    el.closest(".ttdb-tabs").querySelectorAll(".ttdb-tab").forEach(t=>t.classList.remove("active"));
+    el.classList.add("active");
+    state.dash.petSort = sortBy;
+    dashRenderPeticionesTipologia();
+  };
+
   window.addEventListener("resize", () => {
     if (state.dash.items.length && document.getElementById("tt-dashboard")) {
       const months = dashBuildMonths(state.dash.windowM);
@@ -3303,6 +3417,6 @@
   installNetworkHooks();
   installObserver();
   createPanel();
-  setOutput("✅ Listo (v5).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' → pestaña Volumetría o 💬 Consultas.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.");
+  setOutput("✅ Listo (v6).\n- Network logger activo (bodies + headers).\n- Pulsa '📊 Vol.' → pestaña Volumetría o 💬 Consultas.\n- Pulsa '⬇ Export' para descargar los 2 JSON al terminar.\n- v6: sección Peticiones por tipología con barras apiladas, % completado y trend MoM.");
 
 })();
